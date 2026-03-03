@@ -1,0 +1,52 @@
+%option lang = "C++"
+
+%decls %{
+#include <iostream>
+#include <string>
+
+using stdstring = std::string;
+%}
+
+%{
+    #include "ExprAstParser.hpp"
+%}
+
+%node AstNode %abstract %typedef = {
+    %nocreate int line = {0};
+    %nocreate int column = {0};
+}
+%node Expr AstNode %abstract
+
+%operation %virtual stdstring toString(AstNode *this)
+%operation %virtual int evaluate(AstNode *this)
+
+%node BinaryExpr Expr %abstract = {
+    Expr *expr1;
+    Expr *expr2;
+}
+
+%node AddExpr BinaryExpr
+toString(AddExpr){
+    return expr1->toString() + " + " + expr2->toString();
+}
+evaluate(AddExpr){
+    return expr1->evaluate() + expr2->evaluate();
+}
+
+%node MultExpr BinaryExpr
+toString(MultExpr){
+    return expr1->toString() + " * " + expr2->toString();
+}
+evaluate(MultExpr){
+    return expr1->evaluate() * expr2->evaluate();
+}
+
+%node NumberVal Expr = {
+    long value;
+}
+toString(NumberVal){
+    return std::to_string(value);
+}
+evaluate(NumberVal){
+    return value;
+}
