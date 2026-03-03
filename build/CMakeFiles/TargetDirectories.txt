@@ -1,4 +1,0 @@
-/home/darky/projects/comp2_clase/build/CMakeFiles/generate_lexer.dir
-/home/darky/projects/comp2_clase/build/CMakeFiles/Compiler.dir
-/home/darky/projects/comp2_clase/build/CMakeFiles/edit_cache.dir
-/home/darky/projects/comp2_clase/build/CMakeFiles/rebuild_cache.dir
