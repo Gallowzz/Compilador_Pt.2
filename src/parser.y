@@ -109,7 +109,7 @@ input:
 
 program:
       /* empty */ { $$ = new ProgramNode(); }
-    | program declaration { $$ = $1; }
+    | program declaration { $1->addDecl($2); $$ = $1; }
 ;
 
 declaration:
@@ -130,7 +130,7 @@ funcDecl:
 ;
 
 paramList:
-      paramList "," param { $$ = $1; }
+      paramList "," param { $1->addParam($3); $$ =$1; }
     | param               { $$ = new ParamListNode($1); }
 ;
 
@@ -183,7 +183,7 @@ block:
 
 stmtList:
       /* empty */        { $$ = new BlockNode(); }
-    | stmtList statement { $1->addStmt($2); $$ = $1}
+    | stmtList statement { $1->addStmt($2); $$ = $1; }
 ;
 
 expr:

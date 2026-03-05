@@ -20,10 +20,18 @@ using stdstring = std::string;
 }
 
 // ####################################
-// Main Node Types
+// Common Node Types
 // ####################################
 %node Stmt AstNode %abstract
 %node Expr AstNode %abstract
+
+// ####################################
+// Program Node
+// ####################################
+%node ProgramNode AstNode = {
+
+}
+
 
 // ####################################
 // Operations
@@ -151,10 +159,10 @@ toString(DivExpr){
 evaluate(DivExpr){
     int b = expr2->evaluate(); // Divisor, si es 0 tira error
     if (b == 0) {
-        std::cerr < "Runtime Error: Division by zero\n";
+        std::cerr << "Runtime Error: Division by zero\n";
         return 0;
     }
-    return expr1->evaluate / b;
+    return expr1->evaluate() / b;
 }
 
 %node ModExpr BinaryExpr
@@ -164,7 +172,7 @@ toString(ModExpr){
 evaluate(ModExpr){
     int b = expr2->evaluate(); // Modulo, si es 0 tira error
     if (b == 0) {
-        std::cerr < "Runtime Error: Modulo by zero\n";
+        std::cerr << "Runtime Error: Modulo by zero\n";
         return 0;
     }
     return expr1->evaluate / b;
@@ -178,7 +186,7 @@ toString(NotExpr){
     return "!" + expr->toString();
 }
 evaluate(NotExpr){
-    return !expr1->evaluate();
+    return !expr->evaluate();
 }
 
 %node NegExpr UnaryExpr
@@ -186,7 +194,7 @@ toString(NegExpr){
     return "-" + expr->toString();
 }
 evaluate(NegExpr){
-    return -expr1->evaluate();
+    return -expr->evaluate();
 }
 
 
@@ -226,7 +234,7 @@ evaluate(IdVal){
 toString(ArgListExpr){
     stdstring text = head->toString();
     if (tail != nullptr) {
-        text += ", " + tail.toString();
+        text += ", " + tail->toString();
     }
     return text;
 }
