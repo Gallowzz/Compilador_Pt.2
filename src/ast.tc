@@ -11,27 +11,129 @@ using stdstring = std::string;
     #include "ExprAstParser.hpp"
 %}
 
+// ####################################
+// Base Node
+// ####################################
 %node AstNode %abstract %typedef = {
     %nocreate int line = {0};
     %nocreate int column = {0};
 }
+
+// ####################################
+// Main Node Types
+// ####################################
 %node Stmt AstNode %abstract
 %node Expr AstNode %abstract
 
+// ####################################
+// Operations
+// ####################################
 %operation %virtual stdstring toString(AstNode *this)
 %operation %virtual int evaluate(AstNode *this)
 
+// ####################################
+// Expr Node Types
+// ####################################
 %node BinaryExpr Expr %abstract = {
     Expr *expr1;
     Expr *expr2;
 }
+%node UnaryExpr Expr %abstract = {
+    Expr *expr;
+}
 
+// ####################################
+// Logical Expressions
+// ####################################
+%node OrExpr BinaryExpr
+toString(OrExpr){
+    return expr1->toString() + " || " + expr2->toString();
+}
+evaluate(OrExpr){
+    if (expr1->evaluate()) return true;
+    return expr2->evaluate();
+}
+
+%node AndExpr BinaryExpr
+toString(AndExpr){
+    return expr1->toString() + " && " + expr2->toString();
+}
+evaluate(AndExpr){
+    if (!expr1->evaluate()) return false;
+    return expr2->evaluate();
+}
+
+// ####################################
+// Equality Expressions
+// ####################################
+%node EqExpr BinaryExpr
+toString(EqExpr){
+    return expr1->toString() + " == " + expr2->toString();
+}
+evaluate(EqExpr){
+    return expr1->evaluate() == expr2->evaluate();
+}
+
+%node NeqExpr BinaryExpr
+toString(NeqExpr){
+    return expr1->toString() + " != " + expr2->toString();
+}
+evaluate(NeqExpr){
+    return expr1->evaluate() != expr2->evaluate();
+}
+
+// ####################################
+// Comparison Expressions
+// ####################################
+%node LessExpr BinaryExpr
+toString(LessExpr){
+    return expr1->toString() + " < " + expr2->toString();
+}
+evaluate(LessExpr){
+    return expr1->evaluate() < expr2->evaluate();
+}
+
+%node GreatExpr BinaryExpr
+toString(GreatExpr){
+    return expr1->toString() + " > " + expr2->toString();
+}
+evaluate(GreatExpr){
+    return expr1->evaluate() > expr2->evaluate();
+}
+
+%node LeqExpr BinaryExpr
+toString(LeqExpr){
+    return expr1->toString() + " <= " + expr2->toString();
+}
+evaluate(LeqExpr){
+    return expr1->evaluate() <= expr2->evaluate();
+}
+
+%node GeqExpr BinaryExpr
+toString(GeqExpr){
+    return expr1->toString() + " >= " + expr2->toString();
+}
+evaluate(GeqExpr){
+    return expr1->evaluate() >= expr2->evaluate();
+}
+
+// ####################################
+// Arithmetic Expressions
+// ####################################
 %node AddExpr BinaryExpr
 toString(AddExpr){
     return expr1->toString() + " + " + expr2->toString();
 }
 evaluate(AddExpr){
     return expr1->evaluate() + expr2->evaluate();
+}
+
+%node SubExpr BinaryExpr
+toString(SubExpr){
+    return expr1->toString() + " - " + expr2->toString();
+}
+evaluate(SubExpr){
+    return expr1->evaluate() - expr2->evaluate();
 }
 
 %node MultExpr BinaryExpr
@@ -42,6 +144,55 @@ evaluate(MultExpr){
     return expr1->evaluate() * expr2->evaluate();
 }
 
+%node DivExpr BinaryExpr
+toString(DivExpr){
+    return expr1->toString() + " / " + expr2->toString();
+}
+evaluate(DivExpr){
+    int b = expr2->evaluate(); // Divisor, si es 0 tira error
+    if (b == 0) {
+        std::cerr < "Runtime Error: Division by zero\n";
+        return 0;
+    }
+    return expr1->evaluate / b;
+}
+
+%node ModExpr BinaryExpr
+toString(ModExpr){
+    return expr1->toString() + " % " + expr2->toString();
+}
+evaluate(ModExpr){
+    int b = expr2->evaluate(); // Modulo, si es 0 tira error
+    if (b == 0) {
+        std::cerr < "Runtime Error: Modulo by zero\n";
+        return 0;
+    }
+    return expr1->evaluate / b;
+}
+
+// ####################################
+// Unary Expressions
+// ####################################
+%node NotExpr UnaryExpr
+toString(NotExpr){
+    return "!" + expr->toString();
+}
+evaluate(NotExpr){
+    return !expr1->evaluate();
+}
+
+%node NegExpr UnaryExpr
+toString(NegExpr){
+    return "-" + expr->toString();
+}
+evaluate(NegExpr){
+    return -expr1->evaluate();
+}
+
+
+// ####################################
+// Primaries
+// ####################################
 %node NumberVal Expr = {
     long value;
 }
@@ -50,4 +201,54 @@ toString(NumberVal){
 }
 evaluate(NumberVal){
     return value;
+}
+
+%node IdVal Expr = {
+    stdstring name;
+}
+toString(IdVal){
+    return name;
+}
+evaluate(IdVal){
+    // Solo funciona con Tabla de Simbolos tecnicamente (Esperar a que el ing diga algo de eso)
+    std::cerr << "Runtime Error: Undefined variable '" << name << "'\n";
+    return 0;
+}
+
+// ####################################
+// Function Calls
+// ####################################
+%node ArgListExpr Expr = {
+    // Deberian ser un vector, pero TreeCC no deja
+    Expr *head;
+    Expr *tail; // Idealmente seria ArgListExpr, pero no hice que funcionara
+}
+toString(ArgListExpr){
+    stdstring text = head->toString();
+    if (tail != nullptr) {
+        text += ", " + tail.toString();
+    }
+    return text;
+}
+evaluate(ArgListExpr){
+    // FuncCall los deberia evaluar individualmente, en teoria
+    return 0;
+}
+
+%node FuncCallExpr Expr = {
+    stdstring funcName;
+    Expr *args; // Idealmente seria ArgListExpr, pero no hice que funcionara
+}
+toString(FuncCallExpr){
+    stdstring text = funcName + "(";
+    if (args != nullptr) {
+        text += args->toString();
+    }
+    text += ")";
+    return text;
+}
+evaluate(FuncCallExpr){
+    // Caso similar a ID, se necesita un function map
+    std::cerr << "Runtime Error: Function '" << funcName << "' not implemented or called.\n";
+    return 0;
 }

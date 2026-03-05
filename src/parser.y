@@ -86,29 +86,7 @@ void ExprParser::Parser::error(const std::string &msg) {
 %%
 
 input:
-    program { ast = $1; }
-;
-
-program:
-      program declaration { $$ = $2; }
-    | { }
-;
-
-declaration:
-      varDecl  { $$ = $1; }
-    | funcDecl { $$ = $2; }
-;
-
-varDecl:
-      "int" IDENTIFIER ";"
-    | "int" IDENTIFIER "=" expr ";"
-;
-
-funcDecl:
-      "def" IDENTIFIER "(" ")" "->" "int" block
-    | "def" IDENTIFIER "(" ")" "->" "void" block
-    | "def" IDENTIFIER "(" paramList ")" "->" "int" block
-    | "def" IDENTIFIER "(" paramList ")" "->" "void" block
+    expr { ast = $1; }
 ;
 
 expr:
@@ -172,5 +150,5 @@ funcCall:
 
 argList:
       argList "," expr { $$ = new ArgListExpr($1,$3); }
-    | expr             { $$ = new ArgListExpr($1); }
+    | expr             { $$ = new ArgListExpr($1, nullptr); }
 ;
