@@ -44,6 +44,13 @@
 %token <long> NUMBER "number"
 %token <std::string> IDENTIFIER "identifier"
 
+%right "!"
+%left "*" "/" "%"
+%left "+" "-"
+%left "==" "!=" "<" ">" "<=" ">="
+%left "&&" "||"
+%right "="
+
 %nterm <Expr*> expr
 %nterm <Expr*> term
 %nterm <Expr*> factor
