@@ -52,9 +52,8 @@
 %right "="
 
 %nterm <AstNode*> program
-%nterm <AstNode*> declaration
-%nterm <AstNode*> varDecl
-%nterm <AstNode*> funcDecl
+%nterm <Stmt*> declaration
+%nterm <Stmt*> funcDecl
 %nterm <AstNode*> paramList
 %nterm <AstNode*> param
 
@@ -67,6 +66,7 @@
 %nterm <Stmt*> returnStmt
 %nterm <Stmt*> exprStmt
 %nterm <Stmt*> block
+%nterm <Stmt*> stmtList
 
 %nterm <Expr*> expr
 %nterm <Expr*> logicalOr
@@ -108,34 +108,35 @@ input:
 
 
 program:
-    program declaration
+      /* empty */ { $$ = new ProgramNode(); }
+    | program declaration { $$ = $1; }
 ;
 
 declaration:
-      varDecl
-    | funcDecl
+      varDecl  { $$ = $1; }
+    | funcDecl { $$ = $1; }
 ;
 
 varDecl:
-      "int" IDENTIFIER "=" expr ";"
-    | "int" IDENTIFIER ";"
+      "int" IDENTIFIER "=" expr ";" { $$ = new VarDeclNode($2,$4); }
+    | "int" IDENTIFIER ";"          { $$ = new VarDeclNode($2,nullptr); }
 ;
 
 funcDecl:
-      "def" IDENTIFIER "(" paramList ")" "->" "int" block
-    | "def" IDENTIFIER "(" paramList ")" "->" "void" block
-    | "def" IDENTIFIER "("  ")" "->" "int" block
-    | "def" IDENTIFIER "("  ")" "->" "void" block
+      "def" IDENTIFIER "(" paramList ")" "->" "int" block   { $$ = new FuncDeclNode($2,$4,true,$7); }
+    | "def" IDENTIFIER "(" paramList ")" "->" "void" block  { $$ = new FuncDeclNode($2,$4,false,$7); }
+    | "def" IDENTIFIER "("  ")" "->" "int" block            { $$ = new FuncDeclNode($2,nullptr,true,$7); }
+    | "def" IDENTIFIER "("  ")" "->" "void" block           { $$ = new FuncDeclNode($2,nullptr,false,$6); }
 ;
 
 paramList:
-      paramList "," param
-    | param
+      paramList "," param { $$ = $1; }
+    | param               { $$ = new ParamListNode($1); }
 ;
 
 param:
-      "int" "ref" IDENTIFIER
-    | "int" IDENTIFIER
+      "int" "ref" IDENTIFIER { $$ = new ParamNode($3, true); }
+    | "int" IDENTIFIER       { $$ = new ParamNode($2, false); }
 ;
 
 
@@ -151,36 +152,39 @@ statement:
 ;
 
 assignment:
-    IDENTIFIER "=" expr ";"
+    IDENTIFIER "=" expr ";"  { $$ = new AssignStmt($1,$3); }
 ;
 
 ifStmt:
-      "if" "(" expr ")" statement "else" statement
-    | "if" "(" expr ")" statement
+      "if" "(" expr ")" statement "else" statement { $$ = new IfStmt($3,$5,$7); }
+    | "if" "(" expr ")" statement                  { $$ = new IfStmt($3,$5,nullptr); }
 ;
 
 whileStmt:
-    "while" "(" expr ")" statement
+    "while" "(" expr ")" statement { $$ = new WhileStmt($3,$5); }
 ;
 
 printStmt:
-    "print" "(" expr ")" ";"
+    "print" "(" expr ")" ";" { $$ = new PrintStmt($3); }
 ;
 
 returnStmt:
-      "return" expr ";"
-    | "return" ";"
+      "return" expr ";" { $$ = new ReturnStmt($2); }
+    | "return" ";"      { $$ = new ReturnStmt(nullptr); }
 ;
 
 exprStmt:
-    funcCall ";"
+    funcCall ";" { $$ = new ExprStmt($1); }
 ;
 
 block:
-      "{" statement "}"
-    | "{" "}"
+    "{" stmtList "}" { $$ = $2; }
 ;
 
+stmtList:
+      /* empty */        { $$ = new BlockNode(); }
+    | stmtList statement { $1->addStmt($2); $$ = $1}
+;
 
 expr:
       logicalOr { $$ = $1; }
