@@ -15,6 +15,7 @@ using stdstring = std::string;
     %nocreate int line = {0};
     %nocreate int column = {0};
 }
+%node Stmt AstNode %abstract
 %node Expr AstNode %abstract
 
 %operation %virtual stdstring toString(AstNode *this)

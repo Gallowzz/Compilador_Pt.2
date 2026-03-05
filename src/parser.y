@@ -52,8 +52,16 @@
 %right "="
 
 %nterm <Expr*> expr
+%nterm <Expr*> logicalOr
+%nterm <Expr*> logicalAnd
+%nterm <Expr*> equality
+%nterm <Expr*> comparison
 %nterm <Expr*> term
 %nterm <Expr*> factor
+%nterm <Expr*> unary
+%nterm <Expr*> primary
+%nterm <Expr*> funcCall
+%nterm <Expr*> argList
 
 %code requires {
 #include "ExprAstParser.hpp"
@@ -78,20 +86,91 @@ void ExprParser::Parser::error(const std::string &msg) {
 %%
 
 input:
-    expr { ast = $1; }
+    program { ast = $1; }
+;
+
+program:
+      program declaration { $$ = $2; }
+    | { }
+;
+
+declaration:
+      varDecl  { $$ = $1; }
+    | funcDecl { $$ = $2; }
+;
+
+varDecl:
+      "int" IDENTIFIER ";"
+    | "int" IDENTIFIER "=" expr ";"
+;
+
+funcDecl:
+      "def" IDENTIFIER "(" ")" "->" "int" block
+    | "def" IDENTIFIER "(" ")" "->" "void" block
+    | "def" IDENTIFIER "(" paramList ")" "->" "int" block
+    | "def" IDENTIFIER "(" paramList ")" "->" "void" block
 ;
 
 expr:
-      expr "+" term { $$ = new AddExpr($1, $3); }
-    | term          { $$ = $1; }
+      logicalOr { $$ = $1; }
+;
+
+logicalOr:
+      logicalOr "||" logicalAnd { $$ = new OrExpr($1, $3); }
+    | logicalAnd { $$ = $1; }
+;
+
+logicalAnd:
+    logicalAnd "&&" equality { $$ = new AndExpr($1, $3); }
+  | equality { $$ = $1; }
+;
+
+equality:
+    equality "==" comparison { $$ = new EqExpr($1, $3); }
+  | equality "!=" comparison { $$ = new NeqExpr($1, $3); }
+  | comparison { $$ = $1; }
+;
+
+comparison:
+    comparison "<" term { $$ = new LessExpr($1, $3); }
+  | comparison ">" term { $$ = new GreatExpr($1, $3); }
+  | comparison "<=" term { $$ = new LeqExpr($1, $3); }
+  | comparison ">=" term { $$ = new GeqExpr($1, $3); }
+  | term { $$ = $1; }
 ;
 
 term:
-      term "*" factor { $$ = new MultExpr($1, $3); }
+      term "+" factor { $$ = new AddExpr($1, $3); }
+    | term "-" factor { $$ = new SubExpr($1, $3); }
     | factor          { $$ = $1; }
 ;
 
 factor:
-      "(" expr ")" { $$ = $2; }
-    | NUMBER                  { $$ = new NumberVal($1); }
+      factor "*" unary { $$ = new MultExpr($1, $3); }
+    | factor "/" unary { $$ = new DivExpr($1, $3); }
+    | factor "%" unary { $$ = new ModExpr($1, $3); }
+    | unary            { $$ = $1; }
+;
+
+unary:
+      "!" unary   { $$ = new NotExpr($2); }
+    | "-" unary   { $$ = new NegExpr($2); }
+    | primary     { $$ = $1; }
+;
+
+primary:
+      "(" expr ")"     { $$ = $2; }
+    | NUMBER           { $$ = new NumberVal($1); }
+    | IDENTIFIER       { $$ = new IdVal($1); }
+    | funcCall         { $$ = $1; }
+;
+
+funcCall:
+      IDENTIFIER "(" ")"         { $$ = new FuncCallExpr($1, nullptr); }
+    | IDENTIFIER "(" argList ")" { $$ = new FuncCallExpr($1, $3); }
+;
+
+argList:
+      argList "," expr { $$ = new ArgListExpr($1,$3); }
+    | expr             { $$ = new ArgListExpr($1); }
 ;
