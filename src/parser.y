@@ -51,6 +51,23 @@
 %left "&&" "||"
 %right "="
 
+%nterm <AstNode*> program
+%nterm <AstNode*> declaration
+%nterm <AstNode*> varDecl
+%nterm <AstNode*> funcDecl
+%nterm <AstNode*> paramList
+%nterm <AstNode*> param
+
+%nterm <Stmt*> statement
+%nterm <Stmt*> varDecl
+%nterm <Stmt*> assignment
+%nterm <Stmt*> ifStmt
+%nterm <Stmt*> whileStmt
+%nterm <Stmt*> printStmt
+%nterm <Stmt*> returnStmt
+%nterm <Stmt*> exprStmt
+%nterm <Stmt*> block
+
 %nterm <Expr*> expr
 %nterm <Expr*> logicalOr
 %nterm <Expr*> logicalAnd
@@ -86,8 +103,84 @@ void ExprParser::Parser::error(const std::string &msg) {
 %%
 
 input:
-    expr { ast = $1; }
+    program { ast = $1; }
 ;
+
+
+program:
+    program declaration
+;
+
+declaration:
+      varDecl
+    | funcDecl
+;
+
+varDecl:
+      "int" IDENTIFIER "=" expr ";"
+    | "int" IDENTIFIER ";"
+;
+
+funcDecl:
+      "def" IDENTIFIER "(" paramList ")" "->" "int" block
+    | "def" IDENTIFIER "(" paramList ")" "->" "void" block
+    | "def" IDENTIFIER "("  ")" "->" "int" block
+    | "def" IDENTIFIER "("  ")" "->" "void" block
+;
+
+paramList:
+      paramList "," param
+    | param
+;
+
+param:
+      "int" "ref" IDENTIFIER
+    | "int" IDENTIFIER
+;
+
+
+statement:
+      varDecl
+    | assignment
+    | ifStmt
+    | whileStmt
+    | printStmt
+    | returnStmt
+    | exprStmt
+    | block
+;
+
+assignment:
+    IDENTIFIER "=" expr ";"
+;
+
+ifStmt:
+      "if" "(" expr ")" statement "else" statement
+    | "if" "(" expr ")" statement
+;
+
+whileStmt:
+    "while" "(" expr ")" statement
+;
+
+printStmt:
+    "print" "(" expr ")" ";"
+;
+
+returnStmt:
+      "return" expr ";"
+    | "return" ";"
+;
+
+exprStmt:
+    funcCall ";"
+;
+
+block:
+      "{" statement "}"
+    | "{" "}"
+;
+
 
 expr:
       logicalOr { $$ = $1; }
