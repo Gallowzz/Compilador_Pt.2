@@ -24,7 +24,6 @@ int main(int argc, const char* argv[]) {
 
 	if (parser.parse() == 0 && ast){
 	    std::cout << "Expression: " << ast->toString() << "\n";
-		std::cout << "Result: " << ast->evaluate() << "\n";
     } else {
         std::cout << "Parse failed.\n";
 	}
