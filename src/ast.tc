@@ -34,8 +34,74 @@ using stdstring = std::string;
 // ####################################
 // Program Node
 // ####################################
-%node ProgramNode AstNode = {
+%node ProgramNode AstNode
 
+// ####################################
+// Stmt Nodes
+// ####################################
+%node Assignment Stmt = {
+    stdstring id;
+    Expr *expr;
+}
+toString(Assignment){
+    return id + " = " + expr->toString() + ";";
+}
+
+%node IfStmt Stmt = {
+    Expr *condition;
+    Stmt *ifBody;
+    Stmt *elseBody;
+}
+toString(IfStmt){
+    stdstring = "if (" + condition->toString() + ") " + ifBody->toString();
+    if(elseBody != nullptr){
+        stdstring += " else " + elseBody->toString();
+    }
+    return stdstring;
+}
+
+%node WhileStmt Stmt = {
+    Expr *condition;
+    Stmt *body;
+}
+toString(WhileStmt){
+    return "while (" + condition->toString() +") " body->toString();
+}
+
+%node PrintStmt Stmt = {
+    Expr *expr;
+}
+toString(PrintStmt){
+    return "print (" + expr->toString() +");";
+}
+
+%node ReturnStmt Stmt = {
+    Expr *expr;
+}
+toString(ReturnStmt){
+    if (expr != nullptr){
+        return "return " + expr->toString() + ";";
+    }
+    return "return;"
+}
+
+%node ExprStmt Stmt = {
+    FuncCallExpr *call;
+}
+toString(ExprStmt){
+    return call->toString() + ";"
+}
+
+%node Block Stmt = {
+    Stmt *head;
+    Stmt *tail
+}
+toString(Block){
+    stdstring text = "{" + head->toString() + "}";
+    if (tail != nullptr) {
+        text += "{" + tail->toString() + "}";
+    }
+    return text;
 }
 
 // ####################################
