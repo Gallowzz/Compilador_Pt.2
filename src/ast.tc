@@ -3,29 +3,9 @@
 %decls %{
 #include <iostream>
 #include <string>
+#include "codegen.hpp"
 
 using stdstring = std::string;
-
-class genResult {
-public:
-    stdstring code;
-    stdstring place;
-
-    genResult(stdstring c = "", stdstring p = "")
-        : code(c), place(p) {}
-};
-
-int tempId = 0;
-stdstring newTemp(){
-    tempId += 1;
-    return "%t" + std::to_string(tempId);
-}
-
-int labelId = 0;
-stdstring newLabel(){
-    labelId += 1;
-    return "L" + std::to_string(labelId);
-}
 %}
 
 %{
@@ -43,7 +23,6 @@ stdstring newLabel(){
 // ####################################
 // Common Node Types
 // ####################################
-%node Stmt AstNode %abstract
 %node Expr AstNode %abstract
 
 
@@ -54,140 +33,14 @@ stdstring newLabel(){
 %operation %virtual genResult genExpr(AstNode *this)
 
 // ####################################
-// Program Node
-// ####################################
-%node ProgramNode AstNode
-
-// ####################################
-// Stmt Nodes
-// ####################################
-%node Assignment Stmt = {
-    stdstring id;
-    Expr *expr;
-}
-toString(Assignment){
-    return id + " = " + expr->toString() + ";";
-}
-
-%node IfStmt Stmt = {
-    Expr *condition;
-    Stmt *ifBody;
-    Stmt *elseBody;
-}
-toString(IfStmt){
-    stdstring = "if (" + condition->toString() + ") " + ifBody->toString();
-    if(elseBody != nullptr){
-        stdstring += " else " + elseBody->toString();
-    }
-    return stdstring;
-}
-
-%node WhileStmt Stmt = {
-    Expr *condition;
-    Stmt *body;
-}
-toString(WhileStmt){
-    return "while (" + condition->toString() +") " body->toString();
-}
-
-%node PrintStmt Stmt = {
-    Expr *expr;
-}
-toString(PrintStmt){
-    return "print (" + expr->toString() +");";
-}
-
-%node ReturnStmt Stmt = {
-    Expr *expr;
-}
-toString(ReturnStmt){
-    if (expr != nullptr){
-        return "return " + expr->toString() + ";";
-    }
-    return "return;"
-}
-
-%node ExprStmt Stmt = {
-    FuncCallExpr *call;
-}
-toString(ExprStmt){
-    return call->toString() + ";"
-}
-
-%node Block Stmt = {
-    Stmt *head;
-    Stmt *tail
-}
-toString(Block){
-    stdstring text = "{" + head->toString() + "}";
-    if (tail != nullptr) {
-        text += "{" + tail->toString() + "}";
-    }
-    return text;
-}
-
-// ####################################
 // Expr Node Types
 // ####################################
 %node BinaryExpr Expr %abstract = {
     Expr *expr1;
     Expr *expr2;
-    stdstring code;
-    long place;
 }
 %node UnaryExpr Expr %abstract = {
     Expr *expr;
-    stdstring code;
-    long place;
-}
-
-// ####################################
-// Logical Expressions
-// ####################################
-%node OrExpr BinaryExpr
-toString(OrExpr){
-    return expr1->toString() + " || " + expr2->toString();
-}
-
-%node AndExpr BinaryExpr
-toString(AndExpr){
-    return expr1->toString() + " && " + expr2->toString();
-}
-
-// ####################################
-// Equality Expressions
-// ####################################
-%node EqExpr BinaryExpr
-toString(EqExpr){
-    return expr1->toString() + " == " + expr2->toString();
-}
-
-%node NeqExpr BinaryExpr
-toString(NeqExpr){
-    return expr1->toString() + " != " + expr2->toString();
-}
-
-// ####################################
-// Comparison Expressions
-// ####################################
-%node LessExpr BinaryExpr
-toString(LessExpr){
-    return expr1->toString() + " < " + expr2->toString();
-}
-
-%node GreatExpr BinaryExpr
-toString(GreatExpr){
-    return expr1->toString() + " > " + expr2->toString();
-}
-
-%node LeqExpr BinaryExpr
-toString(LeqExpr){
-    return expr1->toString() + " <= " + expr2->toString();
-}
-
-%node GeqExpr BinaryExpr
-toString(GeqExpr){
-    return expr1->toString() + " >= " + expr2->toString();
 }
 
 // ####################################
@@ -198,33 +51,59 @@ toString(AddExpr){
     return expr1->toString() + " + " + expr2->toString();
 }
 genExpr(AddExpr){
-    genResult exp1 = genExpr(expr1);
-    genResult exp2 = genExpr(expr2);
+    genResult left = expr1->genExpr();
+    genResult right = expr2->genExpr();
     stdstring t = newTemp();
-    stdstring code = exp1.code + exp2.code + t + " = add i64 " + exp1.place + ", " + exp2.place + "\n";
+    stdstring code = left.code + right.code + t + " = add i64 " + left.place + ", " + right.place + "\n";
     return genResult(code,t);
 }
-
-
 
 %node SubExpr BinaryExpr
 toString(SubExpr){
     return expr1->toString() + " - " + expr2->toString();
+}
+genExpr(SubExpr){
+    genResult left = expr1->genExpr();
+    genResult right = expr2->genExpr();
+    stdstring t = newTemp();
+    stdstring code = left.code + right.code + t + " = sub i64 " + left.place + ", " + right.place + "\n";
+    return genResult(code,t);
 }
 
 %node MultExpr BinaryExpr
 toString(MultExpr){
     return expr1->toString() + " * " + expr2->toString();
 }
+genExpr(MultExpr){
+    genResult left = expr1->genExpr();
+    genResult right = expr2->genExpr();
+    stdstring t = newTemp();
+    stdstring code = left.code + right.code + t + " = mul i64 " + left.place + ", " + right.place + "\n";
+    return genResult(code,t);
+}
 
 %node DivExpr BinaryExpr
 toString(DivExpr){
     return expr1->toString() + " / " + expr2->toString();
 }
+genExpr(DivExpr){
+    genResult left = expr1->genExpr();
+    genResult right = expr2->genExpr();
+    stdstring t = newTemp();
+    stdstring code = left.code + right.code + t + " = sdiv i64 " + left.place + ", " + right.place + "\n";
+    return genResult(code,t);
+}
 
 %node ModExpr BinaryExpr
 toString(ModExpr){
     return expr1->toString() + " % " + expr2->toString();
+}
+genExpr(ModExpr){
+    genResult left = expr1->genExpr();
+    genResult right = expr2->genExpr();
+    stdstring t = newTemp();
+    stdstring code = left.code + right.code + t + " = srem i64 " + left.place + ", " + right.place + "\n";
+    return genResult(code,t);
 }
 
 // ####################################
@@ -234,10 +113,22 @@ toString(ModExpr){
 toString(NotExpr){
     return "!" + expr->toString();
 }
+genExpr(NotExpr){
+    genResult exp = expr->genExpr();
+    stdstring t = newTemp();
+    stdstring code = exp.code + t + " = icmp eq i64 " + exp.place + ", 0\n";
+    return genResult(code, t);
+}
 
 %node NegExpr UnaryExpr
 toString(NegExpr){
     return "-" + expr->toString();
+}
+genExpr(NegExpr){
+    genResult exp = expr->genExpr();
+    stdstring t = newTemp();
+    stdstring code = exp.code + t + " = sub i64 0, " + exp.place + "\n";
+    return genResult(code, t);
 }
 
 // ####################################
@@ -249,6 +140,11 @@ toString(NegExpr){
 toString(NumberVal){
     return std::to_string(value);
 }
+genExpr(NumberVal){
+    stdstring t = newTemp();
+    stdstring code = t + " = add i64 0, " + std::to_string(value) + "\n";
+    return genResult(code, t);
+}
 
 %node IdVal Expr = {
     stdstring name;
@@ -256,32 +152,10 @@ toString(NumberVal){
 toString(IdVal){
     return name;
 }
+genExpr(IdVal){
+    Symbol* sym = lookup(name);
 
-// ####################################
-// Function Calls
-// ####################################
-%node ArgListExpr Expr = {
-    // Deberian ser un vector, pero TreeCC no deja
-    Expr *head;
-    Expr *tail; // Idealmente seria ArgListExpr, pero no hice que funcionara
-}
-toString(ArgListExpr){
-    stdstring text = head->toString();
-    if (tail != nullptr) {
-        text += ", " + tail->toString();
-    }
-    return text;
-}
-
-%node FuncCallExpr Expr = {
-    stdstring funcName;
-    Expr *args; // Idealmente seria ArgListExpr, pero no hice que funcionara
-}
-toString(FuncCallExpr){
-    stdstring text = funcName + "(";
-    if (args != nullptr) {
-        text += args->toString();
-    }
-    text += ")";
-    return text;
+    stdstring t = newTemp();
+    stdstring code = t = " = load i64, i64* " + sym->addr + "\n";
+    return genResult(code, t);
 }

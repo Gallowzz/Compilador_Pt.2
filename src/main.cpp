@@ -3,6 +3,7 @@
 
 #include "Lexer.hpp"
 #include "Parser.hpp"
+#include "codegen.hpp"
 #include "ExprAstParser.hpp"
 
 int main(int argc, const char* argv[]) {
@@ -23,7 +24,21 @@ int main(int argc, const char* argv[]) {
 	ExprParser::Parser parser(lexer, ast);
 
 	if (parser.parse() == 0 && ast){
-	    std::cout << "Expression: " << ast->toString() << "\n";
+	    genResult result = ast->genExpr();
+
+		std::ofstream outFile("output.ll");
+		outFile << "declare i32 @printf(i8*,...)\n";
+		outFile << "define i64 @main() {\n";
+		outFile << "entry:\n";
+
+		outFile << result.code;
+		outFile << "call i32 (i8*,...) @printf(i8* @.str, i64 " + result.place + ")\n";
+		outFile << "ret i64 " << result.place << "\n";
+		outFile << "}\n";
+		outFile << "@.str = private constant [4 x i8] c\"%d\\0A\\00\"";
+
+		outFile.close();
+		std::cout << "LLVM IR code generated\n";
     } else {
         std::cout << "Parse failed.\n";
 	}

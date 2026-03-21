@@ -41,6 +41,7 @@ add_executable(${PROJECT_NAME} ${SRC_DIR}/main.cpp
                                ${GEN_DIR}/Lexer.cpp
                                ${GEN_DIR}/Parser.cpp
                                ${GEN_DIR}/ExprAstParser.cpp
+                               ${SRC_DIR}/codegen.cpp
 )
 
 target_include_directories(${PROJECT_NAME}
