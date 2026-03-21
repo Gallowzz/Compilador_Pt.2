@@ -3,11 +3,11 @@
 
 %define api.value.type variant
 %define parse.error verbose
-%define api.namespace {ExprParser}
+%define api.namespace {AstParser}
 %define api.parser.class {Parser}
 
-%parse-param {ExprParser::Lexer& lexer}
-%parse-param {Expr*& ast}
+%parse-param {AstParser::Lexer& lexer}
+%parse-param {Stmt*& ast}
 
 %token KW_INT "int"
 %token KW_VOID "void"
@@ -51,6 +51,10 @@
 %left "&&" "||"
 %right "="
 
+%nterm <Stmt*> stmt
+%nterm <Stmt*> ifStmt
+%nterm <Stmt*> exprStmt
+
 %nterm <Expr*> expr
 %nterm <Expr*> logicalOr
 %nterm <Expr*> logicalAnd
@@ -62,9 +66,9 @@
 %nterm <Expr*> primary
 
 %code requires {
-#include "ExprAstParser.hpp"
+#include "Ast.hpp"
 
-namespace ExprParser {
+namespace AstParser {
     class Lexer;
 }
 }
@@ -74,7 +78,7 @@ namespace ExprParser {
 #include <iostream>
 #include "Lexer.hpp"
 
-void ExprParser::Parser::error(const std::string &msg) {
+void AstParser::Parser::error(const std::string &msg) {
     std::cerr << "Parse error: " << msg << std::endl;
 }
 
@@ -84,7 +88,22 @@ void ExprParser::Parser::error(const std::string &msg) {
 %%
 
 input:
-      expr { ast = $1; }
+    stmt { ast = $1; }
+;
+
+stmt:
+      ifStmt   { $$ = $1; }
+    | exprStmt { $$ = $1; }
+;
+
+ifStmt:
+      "if" "(" expr ")" stmt                  { $$ = new IfStmt($3,$5,nullptr); }
+    | "if" "(" expr ")" stmt "else" stmt      { $$ = new IfStmt($3,$5,$7); }
+;
+
+exprStmt:
+    expr ";" { $$ = new ExprStmt($1); }
+    // | funcCall ";" { $$ = new ExprStmt($1); }
 ;
 
 expr:
@@ -97,19 +116,19 @@ logicalOr:
 ;
 
 logicalAnd:
-    logicalAnd "&&" equality { $$ = new AndExpr($1, $3); }
-  | equality { $$ = $1; }
+      logicalAnd "&&" equality { $$ = new AndExpr($1, $3); }
+    | equality { $$ = $1; }
 ;
 
 equality:
-    equality "==" comparison { $$ = new EqExpr($1, $3); }
-  | equality "!=" comparison { $$ = new NeqExpr($1, $3); }
-  | comparison { $$ = $1; }
+      equality "==" comparison { $$ = new EqExpr($1, $3); }
+    | equality "!=" comparison { $$ = new NeqExpr($1, $3); }
+    | comparison { $$ = $1; }
 ;
 
 comparison:
-      comparison "<" term { $$ = new LessExpr($1, $3); }
-    | comparison ">" term { $$ = new GreatExpr($1, $3); }
+      comparison "<" term  { $$ = new LessExpr($1, $3); }
+    | comparison ">" term  { $$ = new GreatExpr($1, $3); }
     | comparison "<=" term { $$ = new LeqExpr($1, $3); }
     | comparison ">=" term { $$ = new GeqExpr($1, $3); }
     | term { $$ = $1; }

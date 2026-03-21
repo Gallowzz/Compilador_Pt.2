@@ -4,7 +4,7 @@
 #include "Lexer.hpp"
 #include "Parser.hpp"
 #include "codegen.hpp"
-#include "ExprAstParser.hpp"
+#include "Ast.hpp"
 
 int main(int argc, const char* argv[]) {
 	if(argc != 2){
@@ -18,13 +18,13 @@ int main(int argc, const char* argv[]) {
 		return 1;
 	}
 
-    ExprParser::Lexer lexer(inputFile);
+    AstParser::Lexer lexer(inputFile);
 
-    Expr* ast = nullptr;
-	ExprParser::Parser parser(lexer, ast);
+    Stmt* ast = nullptr;
+	AstParser::Parser parser(lexer, ast);
 
 	if (parser.parse() == 0 && ast){
-	    genResult result = ast->genExpr();
+	    genResult result = ast->genCode();
 
 		std::ofstream outFile("output.ll");
 		outFile << "declare i32 @printf(i8*,...)\n";

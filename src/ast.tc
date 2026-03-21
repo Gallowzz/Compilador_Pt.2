@@ -9,7 +9,7 @@ using stdstring = std::string;
 %}
 
 %{
-    #include "ExprAstParser.hpp"
+    #include "Ast.hpp"
 %}
 
 // ####################################
@@ -23,14 +23,76 @@ using stdstring = std::string;
 // ####################################
 // Common Node Types
 // ####################################
+%node Stmt AstNode %abstract
 %node Expr AstNode %abstract
-
 
 // ####################################
 // Operations
 // ####################################
 %operation %virtual stdstring toString(AstNode *this)
-%operation %virtual genResult genExpr(AstNode *this)
+%operation %virtual genResult genCode(AstNode *this)
+
+// ####################################
+// Stmt Nodes
+// ####################################
+%node IfStmt Stmt = {
+    Expr *condition;
+    Stmt *ifBody;
+    Stmt *elseBody;
+}
+toString(IfStmt){
+    stdstring text = "if (" + condition->toString() + ") " + ifBody->toString();
+    if(elseBody != nullptr){
+        text += " else " + elseBody->toString();
+    }
+    return text;
+}
+genCode(IfStmt){
+    genResult cond = condition->genCode();
+    genResult bodyThen = ifBody->genCode();
+    stdstring Lthen = newLabel();
+
+    stdstring code = cond.code;
+
+    if(elseBody != nullptr){
+        genResult bodyElse = elseBody->genCode();
+        stdstring Lelse = newLabel();
+        stdstring Lend  = newLabel();
+
+        code += + "br i1 " + cond.place + ", label %" + Lthen + " , label %" + Lelse + "\n"
+                + Lthen + ":\n"
+                + bodyThen.code
+                + "br label %" + Lend + "\n"
+                + Lelse + ":\n"
+                + bodyElse.code
+                + "br label %" + Lend + "\n"
+                + Lend + ":\n";
+    } else {
+        stdstring Lend  = newLabel();
+
+        code += + "br i1 " + cond.place + ", label %" + Lthen + " , label %" + Lend + "\n"
+                + Lthen + ":\n"
+                + bodyThen.code
+                + "br label %" + Lend + "\n"
+                + Lend + ":\n";
+    }
+
+    return genResult(code);
+}
+
+
+%node ExprStmt Stmt = {
+   Expr *expr;
+}
+toString(ExprStmt){
+    return expr->toString() + ";";
+}
+genCode(ExprStmt){
+    genResult exp = expr->genCode();
+
+    stdstring code = exp.code;
+    return genResult(code);
+}
 
 // ####################################
 // Expr Node Types
@@ -50,9 +112,9 @@ using stdstring = std::string;
 toString(OrExpr){
     return expr1->toString() + " || " + expr2->toString();
 }
-genExpr(OrExpr){
-    genResult left = expr1->genExpr();
-    genResult right = expr2->genExpr();
+genCode(OrExpr){
+    genResult left = expr1->genCode();
+    genResult right = expr2->genCode();
     stdstring t = newTemp();
     stdstring code = left.code + right.code + t + " = or i64 " + left.place + ", " + right.place + "\n";
     return genResult(code,t);
@@ -62,9 +124,9 @@ genExpr(OrExpr){
 toString(AndExpr){
     return expr1->toString() + " && " + expr2->toString();
 }
-genExpr(AndExpr){
-    genResult left = expr1->genExpr();
-    genResult right = expr2->genExpr();
+genCode(AndExpr){
+    genResult left = expr1->genCode();
+    genResult right = expr2->genCode();
     stdstring t = newTemp();
     stdstring code = left.code + right.code + t + " = and i64 " + left.place + ", " + right.place + "\n";
     return genResult(code,t);
@@ -77,9 +139,9 @@ genExpr(AndExpr){
 toString(EqExpr){
     return expr1->toString() + " == " + expr2->toString();
 }
-genExpr(EqExpr){
-    genResult left = expr1->genExpr();
-    genResult right = expr2->genExpr();
+genCode(EqExpr){
+    genResult left = expr1->genCode();
+    genResult right = expr2->genCode();
     stdstring t = newTemp();
     stdstring code = left.code + right.code + t + " = icmp eq i64 " + left.place + ", " + right.place + "\n";
     return genResult(code,t);
@@ -89,9 +151,9 @@ genExpr(EqExpr){
 toString(NeqExpr){
     return expr1->toString() + " != " + expr2->toString();
 }
-genExpr(NeqExpr){
-    genResult left = expr1->genExpr();
-    genResult right = expr2->genExpr();
+genCode(NeqExpr){
+    genResult left = expr1->genCode();
+    genResult right = expr2->genCode();
     stdstring t = newTemp();
     stdstring code = left.code + right.code + t + " = icmp ne i64 " + left.place + ", " + right.place + "\n";
     return genResult(code,t);
@@ -104,9 +166,9 @@ genExpr(NeqExpr){
 toString(LessExpr){
     return expr1->toString() + " < " + expr2->toString();
 }
-genExpr(LessExpr){
-    genResult left = expr1->genExpr();
-    genResult right = expr2->genExpr();
+genCode(LessExpr){
+    genResult left = expr1->genCode();
+    genResult right = expr2->genCode();
     stdstring t = newTemp();
     stdstring code = left.code + right.code + t + " = icmp slt i64 " + left.place + ", " + right.place + "\n";
     return genResult(code,t);
@@ -116,9 +178,9 @@ genExpr(LessExpr){
 toString(GreatExpr){
     return expr1->toString() + " > " + expr2->toString();
 }
-genExpr(GreatExpr){
-    genResult left = expr1->genExpr();
-    genResult right = expr2->genExpr();
+genCode(GreatExpr){
+    genResult left = expr1->genCode();
+    genResult right = expr2->genCode();
     stdstring t = newTemp();
     stdstring code = left.code + right.code + t + " = icmp sgt i64 " + left.place + ", " + right.place + "\n";
     return genResult(code,t);
@@ -128,9 +190,9 @@ genExpr(GreatExpr){
 toString(LeqExpr){
     return expr1->toString() + " <= " + expr2->toString();
 }
-genExpr(LeqExpr){
-    genResult left = expr1->genExpr();
-    genResult right = expr2->genExpr();
+genCode(LeqExpr){
+    genResult left = expr1->genCode();
+    genResult right = expr2->genCode();
     stdstring t = newTemp();
     stdstring code = left.code + right.code + t + " = icmp sle i64 " + left.place + ", " + right.place + "\n";
     return genResult(code,t);
@@ -140,9 +202,9 @@ genExpr(LeqExpr){
 toString(GeqExpr){
     return expr1->toString() + " >= " + expr2->toString();
 }
-genExpr(GeqExpr){
-    genResult left = expr1->genExpr();
-    genResult right = expr2->genExpr();
+genCode(GeqExpr){
+    genResult left = expr1->genCode();
+    genResult right = expr2->genCode();
     stdstring t = newTemp();
     stdstring code = left.code + right.code + t + " = icmp sge i64 " + left.place + ", " + right.place + "\n";
     return genResult(code,t);
@@ -155,9 +217,9 @@ genExpr(GeqExpr){
 toString(AddExpr){
     return expr1->toString() + " + " + expr2->toString();
 }
-genExpr(AddExpr){
-    genResult left = expr1->genExpr();
-    genResult right = expr2->genExpr();
+genCode(AddExpr){
+    genResult left = expr1->genCode();
+    genResult right = expr2->genCode();
     stdstring t = newTemp();
     stdstring code = left.code + right.code + t + " = add i64 " + left.place + ", " + right.place + "\n";
     return genResult(code,t);
@@ -167,9 +229,9 @@ genExpr(AddExpr){
 toString(SubExpr){
     return expr1->toString() + " - " + expr2->toString();
 }
-genExpr(SubExpr){
-    genResult left = expr1->genExpr();
-    genResult right = expr2->genExpr();
+genCode(SubExpr){
+    genResult left = expr1->genCode();
+    genResult right = expr2->genCode();
     stdstring t = newTemp();
     stdstring code = left.code + right.code + t + " = sub i64 " + left.place + ", " + right.place + "\n";
     return genResult(code,t);
@@ -179,9 +241,9 @@ genExpr(SubExpr){
 toString(MultExpr){
     return expr1->toString() + " * " + expr2->toString();
 }
-genExpr(MultExpr){
-    genResult left = expr1->genExpr();
-    genResult right = expr2->genExpr();
+genCode(MultExpr){
+    genResult left = expr1->genCode();
+    genResult right = expr2->genCode();
     stdstring t = newTemp();
     stdstring code = left.code + right.code + t + " = mul i64 " + left.place + ", " + right.place + "\n";
     return genResult(code,t);
@@ -191,9 +253,9 @@ genExpr(MultExpr){
 toString(DivExpr){
     return expr1->toString() + " / " + expr2->toString();
 }
-genExpr(DivExpr){
-    genResult left = expr1->genExpr();
-    genResult right = expr2->genExpr();
+genCode(DivExpr){
+    genResult left = expr1->genCode();
+    genResult right = expr2->genCode();
     stdstring t = newTemp();
     stdstring code = left.code + right.code + t + " = sdiv i64 " + left.place + ", " + right.place + "\n";
     return genResult(code,t);
@@ -203,9 +265,9 @@ genExpr(DivExpr){
 toString(ModExpr){
     return expr1->toString() + " % " + expr2->toString();
 }
-genExpr(ModExpr){
-    genResult left = expr1->genExpr();
-    genResult right = expr2->genExpr();
+genCode(ModExpr){
+    genResult left = expr1->genCode();
+    genResult right = expr2->genCode();
     stdstring t = newTemp();
     stdstring code = left.code + right.code + t + " = srem i64 " + left.place + ", " + right.place + "\n";
     return genResult(code,t);
@@ -218,8 +280,8 @@ genExpr(ModExpr){
 toString(NotExpr){
     return "!" + expr->toString();
 }
-genExpr(NotExpr){
-    genResult exp = expr->genExpr();
+genCode(NotExpr){
+    genResult exp = expr->genCode();
     stdstring t = newTemp();
     stdstring code = exp.code + t + " = icmp eq i64 " + exp.place + ", 0\n";
     return genResult(code, t);
@@ -229,8 +291,8 @@ genExpr(NotExpr){
 toString(NegExpr){
     return "-" + expr->toString();
 }
-genExpr(NegExpr){
-    genResult exp = expr->genExpr();
+genCode(NegExpr){
+    genResult exp = expr->genCode();
     stdstring t = newTemp();
     stdstring code = exp.code + t + " = sub i64 0, " + exp.place + "\n";
     return genResult(code, t);
@@ -245,7 +307,7 @@ genExpr(NegExpr){
 toString(NumberVal){
     return std::to_string(value);
 }
-genExpr(NumberVal){
+genCode(NumberVal){
     stdstring t = newTemp();
     stdstring code = t + " = add i64 0, " + std::to_string(value) + "\n";
     return genResult(code, t);
@@ -257,7 +319,7 @@ genExpr(NumberVal){
 toString(IdVal){
     return name;
 }
-genExpr(IdVal){
+genCode(IdVal){
     Symbol* sym = lookup(name);
 
     stdstring t = newTemp();

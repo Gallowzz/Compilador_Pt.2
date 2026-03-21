@@ -29,8 +29,8 @@ add_custom_command(
 )
 
 add_custom_command(
-    OUTPUT ${GEN_DIR}/ExprAstParser.cpp ${GEN_DIR}/ExprAstParser.hpp
-    COMMAND treecc -o ${GEN_DIR}/ExprAstParser.cpp -h ${GEN_DIR}/ExprAstParser.hpp ${SRC_DIR}/ast.tc
+    OUTPUT ${GEN_DIR}/Ast.cpp ${GEN_DIR}/Ast.hpp
+    COMMAND treecc -o ${GEN_DIR}/Ast.cpp -h ${GEN_DIR}/Ast.hpp ${SRC_DIR}/ast.tc
     MAIN_DEPENDENCY ${SRC_DIR}/ast.tc
     COMMENT "Building the AST using TreeCC"
 )
@@ -40,7 +40,7 @@ add_custom_target(generate_lexer DEPENDS ${GEN_DIR}/Lexer.cpp ${GEN_DIR}/Lexer.h
 add_executable(${PROJECT_NAME} ${SRC_DIR}/main.cpp
                                ${GEN_DIR}/Lexer.cpp
                                ${GEN_DIR}/Parser.cpp
-                               ${GEN_DIR}/ExprAstParser.cpp
+                               ${GEN_DIR}/Ast.cpp
                                ${SRC_DIR}/codegen.cpp
 )
 
