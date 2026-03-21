@@ -21,6 +21,7 @@ int main(int argc, const char* argv[]) {
     AstParser::Lexer lexer(inputFile);
 
     Stmt* ast = nullptr;
+    initTable();
 	AstParser::Parser parser(lexer, ast);
 
 	if (parser.parse() == 0 && ast){

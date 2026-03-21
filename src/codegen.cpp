@@ -24,7 +24,13 @@ void exitScope(){
     symTable.pop_back();
 }
 void insert(Symbol sym){
+    if(symTable.empty()){
+        initTable();
+    }
     symTable.back()[sym.name] = sym;
+}
+void initTable(){
+    symTable.push_back({});
 }
 Symbol* lookup(std::string name){
     for (int i = symTable.size()-1; i>=0; i--){

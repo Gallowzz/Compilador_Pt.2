@@ -26,4 +26,5 @@ std::string newLabel();
 void enterScope();
 void exitScope();
 void insert(Symbol sym);
+void initTable();
 Symbol* lookup(std::string name);

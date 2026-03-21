@@ -52,11 +52,15 @@
 %right "="
 
 %nterm <Stmt*> stmt
+%nterm <Stmt*> varDecl
+%nterm <Stmt*> assignment
 %nterm <Stmt*> ifStmt
 %nterm <Stmt*> whileStmt
 %nterm <Stmt*> printStmt
 %nterm <Stmt*> returnStmt
 %nterm <Stmt*> exprStmt
+%nterm <Stmt*> block
+%nterm <StmtList*> stmtList
 
 %nterm <Expr*> expr
 %nterm <Expr*> logicalOr
@@ -94,12 +98,25 @@ input:
     stmt { ast = $1; }
 ;
 
+varDecl:
+      "int" IDENTIFIER "=" expr ";" { $$ = new VarDecl($2,$4); }
+    | "int" IDENTIFIER ";"          { $$ = new VarDecl($2,nullptr); }
+;
+
+// Statments
 stmt:
-      ifStmt     { $$ = $1; }
+      varDecl    { $$ = $1; }
+    | assignment { $$ = $1; }
+    | ifStmt     { $$ = $1; }
     | whileStmt  { $$ = $1; }
     | printStmt  { $$ = $1; }
     | returnStmt { $$ = $1; }
     | exprStmt   { $$ = $1; }
+    | block      { $$ = $1; }
+;
+
+assignment:
+    IDENTIFIER "=" expr ";"  { $$ = new AssignStmt($1,$3); }
 ;
 
 ifStmt:
@@ -125,6 +142,16 @@ exprStmt:
     // | funcCall ";" { $$ = new ExprStmt($1); }
 ;
 
+block:
+    "{" stmtList "}" { $$ = new Block($2); }
+;
+
+stmtList:
+      /* Empty Block */  { $$ = nullptr; }
+    | stmtList stmt      { $$ = new StmtList($2, $1); }
+;
+
+// Expressions
 expr:
       logicalOr { $$ = $1; }
 ;

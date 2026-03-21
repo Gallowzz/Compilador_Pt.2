@@ -3,6 +3,7 @@
 %decls %{
 #include <iostream>
 #include <string>
+#include <vector>
 #include "codegen.hpp"
 
 using stdstring = std::string;
@@ -33,8 +34,52 @@ using stdstring = std::string;
 %operation %virtual genResult genCode(AstNode *this)
 
 // ####################################
+// Declaration Nodes
+// ####################################
+%node VarDecl Stmt = {
+    stdstring id;
+    Expr *expr;
+}
+toString(VarDecl){
+    if(expr != nullptr){
+        return "int " + id + " = " + expr->toString() + ";";
+    }
+    return "int " + id + ";";
+}
+genCode(VarDecl){
+    stdstring t = newTemp();
+    stdstring code = t + " = alloca i64\n";
+
+    if(expr != nullptr){
+        genResult exp = expr->genCode();
+        code += exp.code + "store i64 " + exp.place + ", i64* " + t + "\n";
+    }
+
+    insert({id, t});
+    return genResult(code);
+}
+
+
+// ####################################
 // Stmt Nodes
 // ####################################
+%node AssignStmt Stmt = {
+    stdstring id;
+    Expr *expr;
+}
+toString(AssignStmt){
+    return id + " = " + expr->toString() + ";";
+}
+genCode(AssignStmt){
+    Symbol* sym = lookup(id);
+    genResult exp = expr->genCode();
+
+    stdstring code = exp.code + "store i64 " + exp.place + ", i64* " + sym->addr + "\n";
+
+    return genResult(code);
+}
+
+
 %node IfStmt Stmt = {
     Expr *condition;
     Stmt *ifBody;
@@ -151,6 +196,55 @@ genCode(ExprStmt){
     genResult exp = expr->genCode();
 
     stdstring code = exp.code;
+    return genResult(code);
+}
+
+%node StmtList Stmt = {
+    Stmt *stmt;
+    StmtList *next;
+}
+toString(StmtList){
+    if(next){
+        return next->toString() + stmt->toString() + "\n";
+    } else {
+        return stmt->toString() + "\n";
+    }
+}
+genCode(StmtList){
+    stdstring code = "";
+    if(next){
+        genResult prev = next->genCode();
+        code += prev.code;
+    }
+
+    genResult curr = stmt->genCode();
+    code += curr.code;
+    return genResult(code);
+}
+
+%node Block Stmt = {
+    StmtList *statements;
+}
+toString(Block){
+    stdstring text = "{\n";
+
+    if(statements){
+        text += + "  " + statements->toString();
+    }
+
+    text += "}";
+    return text;
+}
+genCode(Block){
+    stdstring code = "";
+
+    enterScope();
+    if(statements){
+        genResult body = statements->genCode();
+        code += body.code;
+    }
+    exitScope();
+
     return genResult(code);
 }
 
@@ -381,6 +475,10 @@ toString(IdVal){
 }
 genCode(IdVal){
     Symbol* sym = lookup(name);
+
+    if(!sym){
+        std::cerr << "Variable Not Found";
+    }
 
     stdstring t = newTemp();
     stdstring code = t = " = load i64, i64* " + sym->addr + "\n";
