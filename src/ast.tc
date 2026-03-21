@@ -44,6 +44,57 @@ using stdstring = std::string;
 }
 
 // ####################################
+// Comparison Expressions
+// ####################################
+%node LessExpr BinaryExpr
+toString(LessExpr){
+    return expr1->toString() + " < " + expr2->toString();
+}
+genExpr(LessExpr){
+    genResult left = expr1->genExpr();
+    genResult right = expr2->genExpr();
+    stdstring t = newTemp();
+    stdstring code = left.code + right.code + t + " = icmp slt i64 " + left.place + ", " + right.place + "\n";
+    return genResult(code,t);
+}
+
+%node GreatExpr BinaryExpr
+toString(GreatExpr){
+    return expr1->toString() + " > " + expr2->toString();
+}
+genExpr(GreatExpr){
+    genResult left = expr1->genExpr();
+    genResult right = expr2->genExpr();
+    stdstring t = newTemp();
+    stdstring code = left.code + right.code + t + " = icmp sgt i64 " + left.place + ", " + right.place + "\n";
+    return genResult(code,t);
+}
+
+%node LeqExpr BinaryExpr
+toString(LeqExpr){
+    return expr1->toString() + " <= " + expr2->toString();
+}
+genExpr(LeqExpr){
+    genResult left = expr1->genExpr();
+    genResult right = expr2->genExpr();
+    stdstring t = newTemp();
+    stdstring code = left.code + right.code + t + " = icmp sle i64 " + left.place + ", " + right.place + "\n";
+    return genResult(code,t);
+}
+
+%node GeqExpr BinaryExpr
+toString(GeqExpr){
+    return expr1->toString() + " >= " + expr2->toString();
+}
+genExpr(GeqExpr){
+    genResult left = expr1->genExpr();
+    genResult right = expr2->genExpr();
+    stdstring t = newTemp();
+    stdstring code = left.code + right.code + t + " = icmp sge i64 " + left.place + ", " + right.place + "\n";
+    return genResult(code,t);
+}
+
+// ####################################
 // Arithmetic Expressions
 // ####################################
 %node AddExpr BinaryExpr

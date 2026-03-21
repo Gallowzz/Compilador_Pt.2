@@ -44,7 +44,15 @@
 %token <long> NUMBER "number"
 %token <std::string> IDENTIFIER "identifier"
 
+%right "!"
+%left "*" "/" "%"
+%left "+" "-"
+%left "==" "!=" "<" ">" "<=" ">="
+%left "&&" "||"
+%right "="
+
 %nterm <Expr*> expr
+%nterm <Expr*> comparison
 %nterm <Expr*> term
 %nterm <Expr*> factor
 %nterm <Expr*> unary
@@ -77,7 +85,15 @@ input:
 ;
 
 expr:
-      term { $$ = $1; }
+      comparison { $$ = $1; }
+;
+
+comparison:
+      comparison "<" term { $$ = new LessExpr($1, $3); }
+    | comparison ">" term { $$ = new GreatExpr($1, $3); }
+    | comparison "<=" term { $$ = new LeqExpr($1, $3); }
+    | comparison ">=" term { $$ = new GeqExpr($1, $3); }
+    | term { $$ = $1; }
 ;
 
 term:

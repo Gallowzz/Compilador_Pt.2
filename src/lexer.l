@@ -26,7 +26,7 @@ return                    { return ExprParser::Parser::token::KW_RETURN; }
 ref                       { return ExprParser::Parser::token::KW_REF; }
 
 [a-zA-Z_][a-zA-Z0-9_]*    { return ExprParser::Parser::token::IDENTIFIER; }
-[-+]?[0-9]+              { yylval.emplace<int>(std::stoi(text())); return ExprParser::Parser::token::NUMBER; }
+[0-9]+              { yylval.emplace<int>(std::stoi(text())); return ExprParser::Parser::token::NUMBER; }
 
 "+"                       { return ExprParser::Parser::token::OP_PLUS; }
 "-"                       { return ExprParser::Parser::token::OP_MIN; }
