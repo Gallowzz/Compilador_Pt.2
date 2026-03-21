@@ -80,6 +80,66 @@ genCode(IfStmt){
     return genResult(code);
 }
 
+%node WhileStmt Stmt = {
+    Expr *condition;
+    Stmt *body;
+}
+toString(WhileStmt){
+    return "while (" + condition->toString() + ") " + body->toString();
+}
+genCode(WhileStmt){
+    genResult cond = condition->genCode();
+    genResult bod  = body->genCode();
+
+    stdstring Lcond = newLabel();
+    stdstring Lbody = newLabel();
+    stdstring Lend  = newLabel();
+
+    stdstring code = "br label %" + Lcond + "\n"
+                   + Lcond + ":\n"
+                   + cond.code
+                   + "br i1 %" + cond.place + ", label %" + Lbody + ", label %" + Lend + "\n"
+                   + Lbody + ":\n"
+                   + bod.code
+                   + "br label %" + Lcond + "\n"
+                   + Lend + ":\n";
+    return genResult(code);
+}
+
+%node PrintStmt Stmt = {
+    Expr *expr;
+}
+toString(PrintStmt){
+    return "print (" + expr->toString() +");";
+}
+genCode(PrintStmt){
+    genResult exp = expr->genCode();
+
+    stdstring code = exp.code + "call i32 (i8*,...) @printf(i8* @.numStr, i64 " + exp.place + ")\n";
+    return genResult(code);
+}
+
+%node ReturnStmt Stmt = {
+    Expr *expr;
+}
+toString(ReturnStmt){
+    if (expr != nullptr){
+        return "return " + expr->toString() + ";";
+    }
+    return "return;";
+}
+genCode(ReturnStmt){
+    stdstring code = "";
+
+    if (expr != nullptr){
+        genResult exp = expr->genCode();
+        code += exp.code + "ret i64 " + exp.place + "\n";
+        return code;
+    }
+
+    code += "ret i64 0\n";
+    return code;
+}
 
 %node ExprStmt Stmt = {
    Expr *expr;

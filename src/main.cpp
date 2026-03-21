@@ -32,10 +32,8 @@ int main(int argc, const char* argv[]) {
 		outFile << "entry:\n";
 
 		outFile << result.code;
-		outFile << "call i32 (i8*,...) @printf(i8* @.str, i64 " + result.place + ")\n";
-		outFile << "ret i64 " << result.place << "\n";
 		outFile << "}\n";
-		outFile << "@.str = private constant [4 x i8] c\"%d\\0A\\00\"";
+		outFile << "@.numStr = private constant [4 x i8] c\"%d\\0A\\00\"";
 
 		outFile.close();
 		std::cout << "LLVM IR code generated\n";

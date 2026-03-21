@@ -53,6 +53,9 @@
 
 %nterm <Stmt*> stmt
 %nterm <Stmt*> ifStmt
+%nterm <Stmt*> whileStmt
+%nterm <Stmt*> printStmt
+%nterm <Stmt*> returnStmt
 %nterm <Stmt*> exprStmt
 
 %nterm <Expr*> expr
@@ -92,13 +95,29 @@ input:
 ;
 
 stmt:
-      ifStmt   { $$ = $1; }
-    | exprStmt { $$ = $1; }
+      ifStmt     { $$ = $1; }
+    | whileStmt  { $$ = $1; }
+    | printStmt  { $$ = $1; }
+    | returnStmt { $$ = $1; }
+    | exprStmt   { $$ = $1; }
 ;
 
 ifStmt:
       "if" "(" expr ")" stmt                  { $$ = new IfStmt($3,$5,nullptr); }
     | "if" "(" expr ")" stmt "else" stmt      { $$ = new IfStmt($3,$5,$7); }
+;
+
+whileStmt:
+    "while" "(" expr ")" stmt { $$ = new WhileStmt($3,$5); }
+;
+
+printStmt:
+    "print" "(" expr ")" ";" { $$ = new PrintStmt($3); }
+;
+
+returnStmt:
+      "return" expr ";" { $$ = new ReturnStmt($2); }
+    | "return" ";"      { $$ = new ReturnStmt(nullptr); }
 ;
 
 exprStmt:
