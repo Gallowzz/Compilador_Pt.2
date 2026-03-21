@@ -52,6 +52,9 @@
 %right "="
 
 %nterm <Expr*> expr
+%nterm <Expr*> logicalOr
+%nterm <Expr*> logicalAnd
+%nterm <Expr*> equality
 %nterm <Expr*> comparison
 %nterm <Expr*> term
 %nterm <Expr*> factor
@@ -85,7 +88,23 @@ input:
 ;
 
 expr:
-      comparison { $$ = $1; }
+      logicalOr { $$ = $1; }
+;
+
+logicalOr:
+      logicalOr "||" logicalAnd { $$ = new OrExpr($1, $3); }
+    | logicalAnd { $$ = $1; }
+;
+
+logicalAnd:
+    logicalAnd "&&" equality { $$ = new AndExpr($1, $3); }
+  | equality { $$ = $1; }
+;
+
+equality:
+    equality "==" comparison { $$ = new EqExpr($1, $3); }
+  | equality "!=" comparison { $$ = new NeqExpr($1, $3); }
+  | comparison { $$ = $1; }
 ;
 
 comparison:

@@ -44,6 +44,60 @@ using stdstring = std::string;
 }
 
 // ####################################
+// Logical Expressions
+// ####################################
+%node OrExpr BinaryExpr
+toString(OrExpr){
+    return expr1->toString() + " || " + expr2->toString();
+}
+genExpr(OrExpr){
+    genResult left = expr1->genExpr();
+    genResult right = expr2->genExpr();
+    stdstring t = newTemp();
+    stdstring code = left.code + right.code + t + " = or i64 " + left.place + ", " + right.place + "\n";
+    return genResult(code,t);
+}
+
+%node AndExpr BinaryExpr
+toString(AndExpr){
+    return expr1->toString() + " && " + expr2->toString();
+}
+genExpr(AndExpr){
+    genResult left = expr1->genExpr();
+    genResult right = expr2->genExpr();
+    stdstring t = newTemp();
+    stdstring code = left.code + right.code + t + " = and i64 " + left.place + ", " + right.place + "\n";
+    return genResult(code,t);
+}
+
+// ####################################
+// Equality Expressions
+// ####################################
+%node EqExpr BinaryExpr
+toString(EqExpr){
+    return expr1->toString() + " == " + expr2->toString();
+}
+genExpr(EqExpr){
+    genResult left = expr1->genExpr();
+    genResult right = expr2->genExpr();
+    stdstring t = newTemp();
+    stdstring code = left.code + right.code + t + " = icmp eq i64 " + left.place + ", " + right.place + "\n";
+    return genResult(code,t);
+}
+
+%node NeqExpr BinaryExpr
+toString(NeqExpr){
+    return expr1->toString() + " != " + expr2->toString();
+}
+genExpr(NeqExpr){
+    genResult left = expr1->genExpr();
+    genResult right = expr2->genExpr();
+    stdstring t = newTemp();
+    stdstring code = left.code + right.code + t + " = icmp ne i64 " + left.place + ", " + right.place + "\n";
+    return genResult(code,t);
+}
+
+// ####################################
 // Comparison Expressions
 // ####################################
 %node LessExpr BinaryExpr
