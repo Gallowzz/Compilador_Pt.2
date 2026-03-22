@@ -11,7 +11,6 @@ std::string newTemp(){
     return "%t" + std::to_string(tempId);
 }
 
-
 std::string newLabel(){
     labelId += 1;
     return "L" + std::to_string(labelId);

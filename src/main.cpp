@@ -29,11 +29,9 @@ int main(int argc, const char* argv[]) {
 
 		std::ofstream outFile("output.ll");
 		outFile << "declare i32 @printf(i8*,...)\n";
-		outFile << "define i64 @main() {\n";
-		outFile << "entry:\n";
 
 		outFile << result.code;
-		outFile << "}\n";
+
 		outFile << "@.numStr = private constant [4 x i8] c\"%d\\0A\\00\"";
 
 		outFile.close();

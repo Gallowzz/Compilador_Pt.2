@@ -28,6 +28,7 @@ ref                       { return AstParser::Parser::token::KW_REF; }
 [a-zA-Z_][a-zA-Z0-9_]*    { yylval.emplace<std::string>(text()); return AstParser::Parser::token::IDENTIFIER; }
 [0-9]+                    { yylval.emplace<long>(std::stol(text())); return AstParser::Parser::token::NUMBER; }
 
+"->"                      { return AstParser::Parser::token::OP_ARROW; }
 "+"                       { return AstParser::Parser::token::OP_PLUS; }
 "-"                       { return AstParser::Parser::token::OP_MIN; }
 "*"                       { return AstParser::Parser::token::OP_MULT; }

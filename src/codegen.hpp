@@ -14,9 +14,10 @@ class Symbol {
 public:
     std::string name;
     std::string addr;
+    bool isRef;
 
-    Symbol(std::string n = "", std::string a = "")
-        : name(n), addr(a) {}
+    Symbol(std::string n = "", std::string a = "", bool r = false)
+        : name(n), addr(a), isRef(r) {}
 
 };
 

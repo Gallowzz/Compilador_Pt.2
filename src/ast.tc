@@ -81,8 +81,108 @@ genCode(VarDecl){
         code += exp.code + "store i64 " + exp.place + ", i64* " + t + "\n";
     }
 
-    insert({id, t});
+    insert({id, t, false});
     return genResult(code);
+}
+
+%node FuncDecl Stmt = {
+    stdstring id;
+    ParamList *paramList;
+    bool retInt;
+    Stmt *body;
+}
+toString(FuncDecl){
+    stdstring text = "def " + id + "(";
+
+    if(paramList) {
+        text += paramList->toString();
+    }
+    text += ") -> ";
+
+    if(retInt){
+        text += "int ";
+    } else {
+        text += "void ";
+    }
+    text += body->toString();
+
+    return text;
+}
+genCode(FuncDecl){
+    stdstring retType = retInt == true ? "i64" : "void";
+
+    stdstring paramsCode = "";
+    stdstring allocaCode = "";
+
+    if(paramList != nullptr){
+        genResult params = paramList->genCode();
+        paramsCode = params.place;
+        allocaCode = params.code;
+    }
+
+    genResult bod = body->genCode();
+
+    stdstring code = "define " + retType + " @" + id + "(" + paramsCode + ") {\n"
+                   + "entry:\n"
+                   + allocaCode
+                   + bod.code;
+
+    if(retType == "void"){
+        code += "ret void\n";
+    }
+
+    code += "}\n";
+    return genResult(code);
+}
+
+// ####################################
+// Parameter Nodes
+// ####################################
+%node ParamList AstNode = {
+    Param *param;
+    ParamList *next;
+}
+toString(ParamList){
+    if(next){
+        return next->toString() + ", " + param->toString();
+    } else {
+        return param->toString();
+    }
+}
+genCode(ParamList){
+    genResult curr = param->genCode();
+
+    if(next != nullptr){
+        genResult rest = next->genCode();
+
+        stdstring code = curr.code + rest.code;
+        stdstring place =  curr.place + ", " + rest.place;
+        return genResult(code, place);
+    }
+
+    return curr;
+}
+
+%node Param AstNode = {
+    stdstring id;
+    bool isRef;
+}
+toString(Param){
+    if(isRef){
+        return "int ref " + id;
+    } else {
+        return "int " + id;
+    }
+}
+genCode(Param){
+    stdstring t = newTemp();
+
+    stdstring code = t + " = alloca i64\n"
+                   + "store i64 %" + id + ", i64* " + t + "\n";
+    stdstring place = "i64 %" + id;
+
+    insert({id, t, isRef});
+    return genResult(code, place);
 }
 
 

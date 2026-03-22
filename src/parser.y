@@ -19,6 +19,7 @@
 %token KW_RETURN "return"
 %token KW_REF "ref"
 
+%token OP_ARROW "->"
 %token OP_PLUS "+"
 %token OP_MIN "-"
 %token OP_MULT "*"
@@ -52,9 +53,14 @@
 %right "="
 
 %nterm <ProgramNode*> program
+%nterm <StmtList*> global
+%nterm <Stmt*> declaration
+%nterm <Stmt*> varDecl
+%nterm <Stmt*> funcDecl
+%nterm <ParamList*> paramList
+%nterm <Param*> param
 
 %nterm <Stmt*> stmt
-%nterm <Stmt*> varDecl
 %nterm <Stmt*> assignment
 %nterm <Stmt*> ifStmt
 %nterm <Stmt*> whileStmt
@@ -97,16 +103,43 @@ void AstParser::Parser::error(const std::string &msg) {
 %%
 
 input:
-    program { ast = $1; }
+      program { ast = $1; }
 ;
 
 program:
-    stmtList { $$ = new ProgramNode($1); }
+      global { $$ = new ProgramNode($1); }
+;
+
+global:
+      /* empty */        { $$ = nullptr; }
+    | global declaration { $$ = new StmtList($2, $1); }
+;
+
+declaration:
+      varDecl   { $$ = $1; }
+    | funcDecl  { $$ = $1; }
 ;
 
 varDecl:
       "int" IDENTIFIER "=" expr ";" { $$ = new VarDecl($2,$4); }
     | "int" IDENTIFIER ";"          { $$ = new VarDecl($2,nullptr); }
+;
+
+funcDecl:
+      "def" IDENTIFIER "(" paramList ")" "->" "int" block   { $$ = new FuncDecl($2,$4,true,$8); }
+    | "def" IDENTIFIER "(" paramList ")" "->" "void" block  { $$ = new FuncDecl($2,$4,false,$8); }
+    | "def" IDENTIFIER "("  ")" "->" "int" block            { $$ = new FuncDecl($2,nullptr,true,$7); }
+    | "def" IDENTIFIER "("  ")" "->" "void" block           { $$ = new FuncDecl($2,nullptr,false,$7); }
+;
+
+paramList:
+      paramList "," param { $$ = new ParamList($3, $1); }
+    | param               { $$ = new ParamList($1, nullptr); }
+;
+
+param:
+      "int" "ref" IDENTIFIER { $$ = new Param($3, true); }
+    | "int" IDENTIFIER       { $$ = new Param($2, false); }
 ;
 
 // Statments
