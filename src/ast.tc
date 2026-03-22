@@ -4,9 +4,11 @@
 #include <iostream>
 #include <string>
 #include <vector>
+#include <map>
 #include "codegen.hpp"
 
 using stdstring = std::string;
+extern std::vector<std::map<std::string, Symbol>> symTable;
 %}
 
 %{
@@ -32,6 +34,30 @@ using stdstring = std::string;
 // ####################################
 %operation %virtual stdstring toString(AstNode *this)
 %operation %virtual genResult genCode(AstNode *this)
+
+// ####################################
+// Program Node
+// ####################################
+%node ProgramNode AstNode = {
+    StmtList *statements;
+}
+toString(ProgramNode){
+    stdstring text = "";
+    if(statements){
+        text += + "  " + statements->toString();
+    }
+    return text;
+}
+genCode(ProgramNode){
+    stdstring code = "";
+
+    if(statements){
+        genResult body = statements->genCode();
+        code += body.code;
+    }
+
+    return genResult(code);
+}
 
 // ####################################
 // Declaration Nodes
@@ -212,13 +238,17 @@ toString(StmtList){
 }
 genCode(StmtList){
     stdstring code = "";
-    if(next){
+
+    if(next != nullptr){
         genResult prev = next->genCode();
         code += prev.code;
     }
 
-    genResult curr = stmt->genCode();
-    code += curr.code;
+    if(stmt != nullptr){
+        genResult curr = stmt->genCode();
+        code += curr.code;
+    }
+
     return genResult(code);
 }
 
@@ -477,10 +507,11 @@ genCode(IdVal){
     Symbol* sym = lookup(name);
 
     if(!sym){
-        std::cerr << "Variable Not Found";
+        std::cerr << "Variable " + name + " Not Found";
+        exit(1);
     }
 
     stdstring t = newTemp();
-    stdstring code = t = " = load i64, i64* " + sym->addr + "\n";
+    stdstring code = t + " = load i64, i64* " + sym->addr + "\n";
     return genResult(code, t);
 }

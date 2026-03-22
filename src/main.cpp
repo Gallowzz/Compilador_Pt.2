@@ -20,7 +20,7 @@ int main(int argc, const char* argv[]) {
 
     AstParser::Lexer lexer(inputFile);
 
-    Stmt* ast = nullptr;
+    ProgramNode* ast = nullptr;
     initTable();
 	AstParser::Parser parser(lexer, ast);
 

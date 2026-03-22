@@ -1,6 +1,7 @@
 #include "codegen.hpp"
 #include <vector>
 #include <map>
+#include <iostream>
 
 int tempId = 0;
 int labelId = 0;
@@ -17,6 +18,7 @@ std::string newLabel(){
 }
 
 std::vector<std::map<std::string, Symbol>> symTable;
+
 void enterScope(){
     symTable.push_back({});
 }
@@ -25,14 +27,21 @@ void exitScope(){
 }
 void insert(Symbol sym){
     if(symTable.empty()){
+        std::cerr << "Debug: Insert into EMPTY table. Initializing...\n";
         initTable();
     }
+    std::cerr << "Debug: Inserting '" << sym.name << "' into scope " << (symTable.size()-1) << "\n";
     symTable.back()[sym.name] = sym;
 }
 void initTable(){
     symTable.push_back({});
 }
 Symbol* lookup(std::string name){
+    if(symTable.empty()){
+        return nullptr;
+    }
+
+    std::cerr << "Debug: Looking up '" << name << "' in " << symTable.size() << " scopes.\n";
     for (int i = symTable.size()-1; i>=0; i--){
         auto it = symTable[i].find(name);
         if (it != symTable[i].end())

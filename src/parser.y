@@ -7,7 +7,7 @@
 %define api.parser.class {Parser}
 
 %parse-param {AstParser::Lexer& lexer}
-%parse-param {Stmt*& ast}
+%parse-param {ProgramNode*& ast}
 
 %token KW_INT "int"
 %token KW_VOID "void"
@@ -50,6 +50,8 @@
 %left "==" "!=" "<" ">" "<=" ">="
 %left "&&" "||"
 %right "="
+
+%nterm <ProgramNode*> program
 
 %nterm <Stmt*> stmt
 %nterm <Stmt*> varDecl
@@ -95,7 +97,11 @@ void AstParser::Parser::error(const std::string &msg) {
 %%
 
 input:
-    stmt { ast = $1; }
+    program { ast = $1; }
+;
+
+program:
+    stmtList { $$ = new ProgramNode($1); }
 ;
 
 varDecl:
