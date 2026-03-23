@@ -79,6 +79,8 @@
 %nterm <Expr*> factor
 %nterm <Expr*> unary
 %nterm <Expr*> primary
+%nterm <Expr*> funcCall
+%nterm <ArgList*> argList
 
 %code requires {
 #include "Ast.hpp"
@@ -242,4 +244,15 @@ primary:
       "(" expr ")"     { $$ = $2; }
     | NUMBER           { $$ = new NumberVal($1); }
     | IDENTIFIER       { $$ = new IdVal($1); }
+    | funcCall         { $$ = $1; }
+;
+
+funcCall:
+      IDENTIFIER "(" ")"          { $$ = new FuncCall($1, nullptr); }
+    | IDENTIFIER "(" argList ")"  { $$ = new FuncCall($1, $3); }
+;
+
+argList:
+      argList "," expr   { $$ = new ArgList($3, $1); }
+    | expr               { $$ = new ArgList($1, nullptr); }
 ;

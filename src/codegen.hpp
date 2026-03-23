@@ -21,6 +21,14 @@ public:
 
 };
 
+class ParamList;
+class FuncSymbol {
+public:
+    std::string name;
+    ParamList* params;
+    bool retInt;
+};
+
 std::string newTemp();
 std::string newLabel();
 
@@ -29,3 +37,7 @@ void exitScope();
 void insert(Symbol sym);
 void initTable();
 Symbol* lookup(std::string name);
+
+void initFuncTable();
+void insertFunction(FuncSymbol sym);
+FuncSymbol* lookupFunction(std::string name);

@@ -1,7 +1,9 @@
 #include "codegen.hpp"
+#include <string>
 #include <vector>
 #include <map>
 #include <iostream>
+#include "Ast.hpp"
 
 int tempId = 0;
 int labelId = 0;
@@ -39,12 +41,23 @@ Symbol* lookup(std::string name){
     if(symTable.empty()){
         return nullptr;
     }
-
     std::cerr << "Debug: Looking up '" << name << "' in " << symTable.size() << " scopes.\n";
     for (int i = symTable.size()-1; i>=0; i--){
         auto it = symTable[i].find(name);
         if (it != symTable[i].end())
             return &it->second;
+    }
+    return nullptr;
+}
+
+std::map<std::string, FuncSymbol> funcTable;
+
+void insertFunction(FuncSymbol sym){
+    funcTable[sym.name] = sym;
+}
+FuncSymbol* lookupFunction(std::string name){
+    if(funcTable.count(name)){
+        return &funcTable[name];
     }
     return nullptr;
 }

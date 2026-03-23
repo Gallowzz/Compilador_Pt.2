@@ -132,6 +132,8 @@ genCode(FuncDecl){
     }
 
     code += "}\n";
+
+    insertFunction({id, paramList, retInt});
     return genResult(code);
 }
 
@@ -177,9 +179,17 @@ toString(Param){
 genCode(Param){
     stdstring t = newTemp();
 
-    stdstring code = t + " = alloca i64\n"
-                   + "store i64 %" + id + ", i64* " + t + "\n";
-    stdstring place = "i64 %" + id;
+    stdstring code = "";
+    stdstring place = "";
+
+    if(isRef){
+        code = t + " = load i64, i64* " + t + "\n";
+        place = "i64* %" + id;
+    } else {
+        code = t + " = alloca i64\n"
+             + "store i64 %" + id + ", i64* " + t + "\n";
+        place = "i64 %" + id;
+    }
 
     insert({id, t, isRef});
     return genResult(code, place);
@@ -614,4 +624,51 @@ genCode(IdVal){
     stdstring t = newTemp();
     stdstring code = t + " = load i64, i64* " + sym->addr + "\n";
     return genResult(code, t);
+}
+
+// ####################################
+// Function Calls
+// ####################################
+%node FuncCall Expr = {
+    stdstring id;
+    ArgList *args;
+}
+toString(FuncCall){
+    stdstring text = id + "(";
+
+    if(args) {
+        text += args->toString();
+    }
+    text += ")";
+
+    return text;
+}
+genCode(FuncCall){
+    // call i32 (i8*,...) @printf(i8* @.numStr, i64 %t9)
+    return genCode();
+}
+
+%node ArgList Expr = {
+    Expr *arg;
+    ArgList *next;
+}
+toString(ArgList){
+    if(next){
+        return next->toString() + ", " + arg->toString();
+    } else {
+        return arg->toString();
+    }
+}
+genCode(ArgList){
+    genResult curr = arg->genCode();
+
+    if(next != nullptr){
+        genResult rest = next->genCode();
+
+        stdstring code = curr.code + rest.code;
+        stdstring place =  curr.place + ", " + rest.place;
+        return genResult(code, place);
+    }
+
+    return curr;
 }
