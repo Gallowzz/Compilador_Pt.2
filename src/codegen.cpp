@@ -53,9 +53,11 @@ Symbol* lookup(std::string name){
 std::map<std::string, FuncSymbol> funcTable;
 
 void insertFunction(FuncSymbol sym){
+    std::cerr << "Debug: Inserting '" << sym.name << "' into Function Table \n";
     funcTable[sym.name] = sym;
 }
 FuncSymbol* lookupFunction(std::string name){
+    std::cerr << "Debug: Searching for '" << name << "' in Function Table \n";
     if(funcTable.count(name)){
         return &funcTable[name];
     }

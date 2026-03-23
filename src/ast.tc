@@ -111,6 +111,8 @@ toString(FuncDecl){
 genCode(FuncDecl){
     stdstring retType = retInt == true ? "i64" : "void";
 
+    insertFunction({id, paramList, retInt});
+
     stdstring paramsCode = "";
     stdstring allocaCode = "";
 
@@ -133,7 +135,6 @@ genCode(FuncDecl){
 
     code += "}\n";
 
-    insertFunction({id, paramList, retInt});
     return genResult(code);
 }
 
@@ -644,8 +645,22 @@ toString(FuncCall){
     return text;
 }
 genCode(FuncCall){
-    // call i32 (i8*,...) @printf(i8* @.numStr, i64 %t9)
-    return genCode();
+    FuncSymbol* func = lookupFunction(id);
+
+    if(!func){
+        std::cerr << "Function " + id + " Not Found";
+        exit(1);
+    }
+
+    genResult arguments = args->genCode();
+    if(func->retInt){
+        stdstring t = newTemp();
+        stdstring code = t + " = call i64 @" + id + "(" + arguments.place + ")\n";
+        return genResult(code,t);
+    } else {
+        stdstring code = "call void @" + id + "(" + arguments.place + ")\n";
+        return genResult(code);
+    }
 }
 
 %node ArgList Expr = {
