@@ -3,7 +3,8 @@
 
 #include "Lexer.hpp"
 #include "Parser.hpp"
-#include "ExprAstParser.hpp"
+#include "codegen.hpp"
+#include "Ast.hpp"
 
 int main(int argc, const char* argv[]) {
 	if(argc != 2){
@@ -17,13 +18,24 @@ int main(int argc, const char* argv[]) {
 		return 1;
 	}
 
-    ExprParser::Lexer lexer(inputFile);
+    AstParser::Lexer lexer(inputFile);
 
-    Expr* ast = nullptr;
-	ExprParser::Parser parser(lexer, ast);
+    ProgramNode* ast = nullptr;
+    initTable();
+	AstParser::Parser parser(lexer, ast);
 
 	if (parser.parse() == 0 && ast){
-	    std::cout << "Expression: " << ast->toString() << "\n";
+	    genResult result = ast->genCode();
+
+		std::ofstream outFile("output.ll");
+		outFile << "declare i32 @printf(i8*,...)\n";
+
+		outFile << result.code;
+
+		outFile << "@.numStr = private constant [4 x i8] c\"%d\\0A\\00\"";
+
+		outFile.close();
+		std::cout << "LLVM IR code generated\n";
     } else {
         std::cout << "Parse failed.\n";
 	}

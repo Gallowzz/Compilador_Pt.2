@@ -3,12 +3,16 @@
 %decls %{
 #include <iostream>
 #include <string>
+#include <vector>
+#include <map>
+#include "codegen.hpp"
 
 using stdstring = std::string;
+extern std::vector<std::map<std::string, Symbol>> symTable;
 %}
 
 %{
-    #include "ExprAstParser.hpp"
+    #include "Ast.hpp"
 %}
 
 // ####################################
@@ -25,27 +29,193 @@ using stdstring = std::string;
 %node Stmt AstNode %abstract
 %node Expr AstNode %abstract
 
-
 // ####################################
 // Operations
 // ####################################
 %operation %virtual stdstring toString(AstNode *this)
+%operation %virtual genResult genCode(AstNode *this)
 
 // ####################################
 // Program Node
 // ####################################
-%node ProgramNode AstNode
+%node ProgramNode AstNode = {
+    StmtList *statements;
+}
+toString(ProgramNode){
+    stdstring text = "";
+    if(statements){
+        text += + "  " + statements->toString();
+    }
+    return text;
+}
+genCode(ProgramNode){
+    stdstring code = "";
+
+    if(statements){
+        genResult body = statements->genCode();
+        code += body.code;
+    }
+
+    return genResult(code);
+}
+
+// ####################################
+// Declaration Nodes
+// ####################################
+%node VarDecl Stmt = {
+    stdstring id;
+    Expr *expr;
+}
+toString(VarDecl){
+    if(expr != nullptr){
+        return "int " + id + " = " + expr->toString() + ";";
+    }
+    return "int " + id + ";";
+}
+genCode(VarDecl){
+    stdstring t = newTemp();
+    stdstring code = t + " = alloca i64\n";
+
+    if(expr != nullptr){
+        genResult exp = expr->genCode();
+        code += exp.code + "store i64 " + exp.place + ", i64* " + t + "\n";
+    }
+
+    insert({id, t, false});
+    return genResult(code);
+}
+
+%node FuncDecl Stmt = {
+    stdstring id;
+    ParamList *paramList;
+    bool retInt;
+    Stmt *body;
+}
+toString(FuncDecl){
+    stdstring text = "def " + id + "(";
+
+    if(paramList) {
+        text += paramList->toString();
+    }
+    text += ") -> ";
+
+    if(retInt){
+        text += "int ";
+    } else {
+        text += "void ";
+    }
+    text += body->toString();
+
+    return text;
+}
+genCode(FuncDecl){
+    stdstring retType = retInt == true ? "i64" : "void";
+
+    insertFunction({id, paramList, retInt});
+
+    stdstring paramsCode = "";
+    stdstring allocaCode = "";
+
+    if(paramList != nullptr){
+        genResult params = paramList->genCode();
+        paramsCode = params.place;
+        allocaCode = params.code;
+    }
+
+    genResult bod = body->genCode();
+
+    stdstring code = "define " + retType + " @" + id + "(" + paramsCode + ") {\n"
+                   + "entry:\n"
+                   + allocaCode
+                   + bod.code;
+
+    if(retType == "void"){
+        code += "ret void\n";
+    }
+
+    code += "}\n";
+
+    return genResult(code);
+}
+
+// ####################################
+// Parameter Nodes
+// ####################################
+%node ParamList AstNode = {
+    Param *param;
+    ParamList *next;
+}
+toString(ParamList){
+    if(next){
+        return next->toString() + ", " + param->toString();
+    } else {
+        return param->toString();
+    }
+}
+genCode(ParamList){
+    genResult curr = param->genCode();
+
+    if(next != nullptr){
+        genResult rest = next->genCode();
+
+        stdstring code = curr.code + rest.code;
+        stdstring place =  curr.place + ", " + rest.place;
+        return genResult(code, place);
+    }
+
+    return curr;
+}
+
+%node Param AstNode = {
+    stdstring id;
+    bool isRef;
+}
+toString(Param){
+    if(isRef){
+        return "int ref " + id;
+    } else {
+        return "int " + id;
+    }
+}
+genCode(Param){
+    stdstring t = newTemp();
+
+    stdstring code = "";
+    stdstring place = "";
+
+    if(isRef){
+        code = t + " = load i64, i64* " + t + "\n";
+        place = "i64* %" + id;
+    } else {
+        code = t + " = alloca i64\n"
+             + "store i64 %" + id + ", i64* " + t + "\n";
+        place = "i64 %" + id;
+    }
+
+    insert({id, t, isRef});
+    return genResult(code, place);
+}
+
 
 // ####################################
 // Stmt Nodes
 // ####################################
-%node Assignment Stmt = {
+%node AssignStmt Stmt = {
     stdstring id;
     Expr *expr;
 }
-toString(Assignment){
+toString(AssignStmt){
     return id + " = " + expr->toString() + ";";
 }
+genCode(AssignStmt){
+    Symbol* sym = lookup(id);
+    genResult exp = expr->genCode();
+
+    stdstring code = exp.code + "store i64 " + exp.place + ", i64* " + sym->addr + "\n";
+
+    return genResult(code);
+}
+
 
 %node IfStmt Stmt = {
     Expr *condition;
@@ -53,11 +223,43 @@ toString(Assignment){
     Stmt *elseBody;
 }
 toString(IfStmt){
-    stdstring = "if (" + condition->toString() + ") " + ifBody->toString();
+    stdstring text = "if (" + condition->toString() + ") " + ifBody->toString();
     if(elseBody != nullptr){
-        stdstring += " else " + elseBody->toString();
+        text += " else " + elseBody->toString();
     }
-    return stdstring;
+    return text;
+}
+genCode(IfStmt){
+    genResult cond = condition->genCode();
+    genResult bodyThen = ifBody->genCode();
+    stdstring Lthen = newLabel();
+
+    stdstring code = cond.code;
+
+    if(elseBody != nullptr){
+        genResult bodyElse = elseBody->genCode();
+        stdstring Lelse = newLabel();
+        stdstring Lend  = newLabel();
+
+        code += + "br i1 " + cond.place + ", label %" + Lthen + " , label %" + Lelse + "\n"
+                + Lthen + ":\n"
+                + bodyThen.code
+                + "br label %" + Lend + "\n"
+                + Lelse + ":\n"
+                + bodyElse.code
+                + "br label %" + Lend + "\n"
+                + Lend + ":\n";
+    } else {
+        stdstring Lend  = newLabel();
+
+        code += + "br i1 " + cond.place + ", label %" + Lthen + ", label %" + Lend + "\n"
+                + Lthen + ":\n"
+                + bodyThen.code
+                + "br label %" + Lend + "\n"
+                + Lend + ":\n";
+    }
+
+    return genResult(code);
 }
 
 %node WhileStmt Stmt = {
@@ -65,7 +267,25 @@ toString(IfStmt){
     Stmt *body;
 }
 toString(WhileStmt){
-    return "while (" + condition->toString() +") " body->toString();
+    return "while (" + condition->toString() + ") " + body->toString();
+}
+genCode(WhileStmt){
+    genResult cond = condition->genCode();
+    genResult bod  = body->genCode();
+
+    stdstring Lcond = newLabel();
+    stdstring Lbody = newLabel();
+    stdstring Lend  = newLabel();
+
+    stdstring code = "br label %" + Lcond + "\n"
+                   + Lcond + ":\n"
+                   + cond.code
+                   + "br i1 %" + cond.place + ", label %" + Lbody + ", label %" + Lend + "\n"
+                   + Lbody + ":\n"
+                   + bod.code
+                   + "br label %" + Lcond + "\n"
+                   + Lend + ":\n";
+    return genResult(code);
 }
 
 %node PrintStmt Stmt = {
@@ -73,6 +293,12 @@ toString(WhileStmt){
 }
 toString(PrintStmt){
     return "print (" + expr->toString() +");";
+}
+genCode(PrintStmt){
+    genResult exp = expr->genCode();
+
+    stdstring code = exp.code + "call i32 (i8*,...) @printf(i8* @.numStr, i64 " + exp.place + ")\n";
+    return genResult(code);
 }
 
 %node ReturnStmt Stmt = {
@@ -82,26 +308,85 @@ toString(ReturnStmt){
     if (expr != nullptr){
         return "return " + expr->toString() + ";";
     }
-    return "return;"
+    return "return;";
+}
+genCode(ReturnStmt){
+    stdstring code = "";
+
+    if (expr != nullptr){
+        genResult exp = expr->genCode();
+        code += exp.code + "ret i64 " + exp.place + "\n";
+        return code;
+    }
+
+    code += "ret i64 0\n";
+    return code;
 }
 
 %node ExprStmt Stmt = {
-    FuncCallExpr *call;
+   Expr *expr;
 }
 toString(ExprStmt){
-    return call->toString() + ";"
+    return expr->toString() + ";";
+}
+genCode(ExprStmt){
+    genResult exp = expr->genCode();
+
+    stdstring code = exp.code;
+    return genResult(code);
+}
+
+%node StmtList Stmt = {
+    Stmt *stmt;
+    StmtList *next;
+}
+toString(StmtList){
+    if(next){
+        return next->toString() + stmt->toString() + "\n";
+    } else {
+        return stmt->toString() + "\n";
+    }
+}
+genCode(StmtList){
+    stdstring code = "";
+
+    if(next != nullptr){
+        genResult prev = next->genCode();
+        code += prev.code;
+    }
+
+    if(stmt != nullptr){
+        genResult curr = stmt->genCode();
+        code += curr.code;
+    }
+
+    return genResult(code);
 }
 
 %node Block Stmt = {
-    Stmt *head;
-    Stmt *tail
+    StmtList *statements;
 }
 toString(Block){
-    stdstring text = "{" + head->toString() + "}";
-    if (tail != nullptr) {
-        text += "{" + tail->toString() + "}";
+    stdstring text = "{\n";
+
+    if(statements){
+        text += + "  " + statements->toString();
     }
+
+    text += "}";
     return text;
+}
+genCode(Block){
+    stdstring code = "";
+
+    enterScope();
+    if(statements){
+        genResult body = statements->genCode();
+        code += body.code;
+    }
+    exitScope();
+
+    return genResult(code);
 }
 
 // ####################################
@@ -122,10 +407,24 @@ toString(Block){
 toString(OrExpr){
     return expr1->toString() + " || " + expr2->toString();
 }
+genCode(OrExpr){
+    genResult left = expr1->genCode();
+    genResult right = expr2->genCode();
+    stdstring t = newTemp();
+    stdstring code = left.code + right.code + t + " = or i64 " + left.place + ", " + right.place + "\n";
+    return genResult(code,t);
+}
 
 %node AndExpr BinaryExpr
 toString(AndExpr){
     return expr1->toString() + " && " + expr2->toString();
+}
+genCode(AndExpr){
+    genResult left = expr1->genCode();
+    genResult right = expr2->genCode();
+    stdstring t = newTemp();
+    stdstring code = left.code + right.code + t + " = and i64 " + left.place + ", " + right.place + "\n";
+    return genResult(code,t);
 }
 
 // ####################################
@@ -135,10 +434,24 @@ toString(AndExpr){
 toString(EqExpr){
     return expr1->toString() + " == " + expr2->toString();
 }
+genCode(EqExpr){
+    genResult left = expr1->genCode();
+    genResult right = expr2->genCode();
+    stdstring t = newTemp();
+    stdstring code = left.code + right.code + t + " = icmp eq i64 " + left.place + ", " + right.place + "\n";
+    return genResult(code,t);
+}
 
 %node NeqExpr BinaryExpr
 toString(NeqExpr){
     return expr1->toString() + " != " + expr2->toString();
+}
+genCode(NeqExpr){
+    genResult left = expr1->genCode();
+    genResult right = expr2->genCode();
+    stdstring t = newTemp();
+    stdstring code = left.code + right.code + t + " = icmp ne i64 " + left.place + ", " + right.place + "\n";
+    return genResult(code,t);
 }
 
 // ####################################
@@ -148,20 +461,48 @@ toString(NeqExpr){
 toString(LessExpr){
     return expr1->toString() + " < " + expr2->toString();
 }
+genCode(LessExpr){
+    genResult left = expr1->genCode();
+    genResult right = expr2->genCode();
+    stdstring t = newTemp();
+    stdstring code = left.code + right.code + t + " = icmp slt i64 " + left.place + ", " + right.place + "\n";
+    return genResult(code,t);
+}
 
 %node GreatExpr BinaryExpr
 toString(GreatExpr){
     return expr1->toString() + " > " + expr2->toString();
+}
+genCode(GreatExpr){
+    genResult left = expr1->genCode();
+    genResult right = expr2->genCode();
+    stdstring t = newTemp();
+    stdstring code = left.code + right.code + t + " = icmp sgt i64 " + left.place + ", " + right.place + "\n";
+    return genResult(code,t);
 }
 
 %node LeqExpr BinaryExpr
 toString(LeqExpr){
     return expr1->toString() + " <= " + expr2->toString();
 }
+genCode(LeqExpr){
+    genResult left = expr1->genCode();
+    genResult right = expr2->genCode();
+    stdstring t = newTemp();
+    stdstring code = left.code + right.code + t + " = icmp sle i64 " + left.place + ", " + right.place + "\n";
+    return genResult(code,t);
+}
 
 %node GeqExpr BinaryExpr
 toString(GeqExpr){
     return expr1->toString() + " >= " + expr2->toString();
+}
+genCode(GeqExpr){
+    genResult left = expr1->genCode();
+    genResult right = expr2->genCode();
+    stdstring t = newTemp();
+    stdstring code = left.code + right.code + t + " = icmp sge i64 " + left.place + ", " + right.place + "\n";
+    return genResult(code,t);
 }
 
 // ####################################
@@ -171,25 +512,60 @@ toString(GeqExpr){
 toString(AddExpr){
     return expr1->toString() + " + " + expr2->toString();
 }
+genCode(AddExpr){
+    genResult left = expr1->genCode();
+    genResult right = expr2->genCode();
+    stdstring t = newTemp();
+    stdstring code = left.code + right.code + t + " = add i64 " + left.place + ", " + right.place + "\n";
+    return genResult(code,t);
+}
 
 %node SubExpr BinaryExpr
 toString(SubExpr){
     return expr1->toString() + " - " + expr2->toString();
+}
+genCode(SubExpr){
+    genResult left = expr1->genCode();
+    genResult right = expr2->genCode();
+    stdstring t = newTemp();
+    stdstring code = left.code + right.code + t + " = sub i64 " + left.place + ", " + right.place + "\n";
+    return genResult(code,t);
 }
 
 %node MultExpr BinaryExpr
 toString(MultExpr){
     return expr1->toString() + " * " + expr2->toString();
 }
+genCode(MultExpr){
+    genResult left = expr1->genCode();
+    genResult right = expr2->genCode();
+    stdstring t = newTemp();
+    stdstring code = left.code + right.code + t + " = mul i64 " + left.place + ", " + right.place + "\n";
+    return genResult(code,t);
+}
 
 %node DivExpr BinaryExpr
 toString(DivExpr){
     return expr1->toString() + " / " + expr2->toString();
 }
+genCode(DivExpr){
+    genResult left = expr1->genCode();
+    genResult right = expr2->genCode();
+    stdstring t = newTemp();
+    stdstring code = left.code + right.code + t + " = sdiv i64 " + left.place + ", " + right.place + "\n";
+    return genResult(code,t);
+}
 
 %node ModExpr BinaryExpr
 toString(ModExpr){
     return expr1->toString() + " % " + expr2->toString();
+}
+genCode(ModExpr){
+    genResult left = expr1->genCode();
+    genResult right = expr2->genCode();
+    stdstring t = newTemp();
+    stdstring code = left.code + right.code + t + " = srem i64 " + left.place + ", " + right.place + "\n";
+    return genResult(code,t);
 }
 
 // ####################################
@@ -199,10 +575,22 @@ toString(ModExpr){
 toString(NotExpr){
     return "!" + expr->toString();
 }
+genCode(NotExpr){
+    genResult exp = expr->genCode();
+    stdstring t = newTemp();
+    stdstring code = exp.code + t + " = icmp eq i64 " + exp.place + ", 0\n";
+    return genResult(code, t);
+}
 
 %node NegExpr UnaryExpr
 toString(NegExpr){
     return "-" + expr->toString();
+}
+genCode(NegExpr){
+    genResult exp = expr->genCode();
+    stdstring t = newTemp();
+    stdstring code = exp.code + t + " = sub i64 0, " + exp.place + "\n";
+    return genResult(code, t);
 }
 
 // ####################################
@@ -214,6 +602,11 @@ toString(NegExpr){
 toString(NumberVal){
     return std::to_string(value);
 }
+genCode(NumberVal){
+    stdstring t = newTemp();
+    stdstring code = t + " = add i64 0, " + std::to_string(value) + "\n";
+    return genResult(code, t);
+}
 
 %node IdVal Expr = {
     stdstring name;
@@ -221,32 +614,110 @@ toString(NumberVal){
 toString(IdVal){
     return name;
 }
+genCode(IdVal){
+    Symbol* sym = lookup(name);
+
+    if(!sym){
+        std::cerr << "Variable " + name + " Not Found";
+        exit(1);
+    }
+
+    stdstring t = newTemp();
+    stdstring code = t + " = load i64, i64* " + sym->addr + "\n";
+    return genResult(code, t);
+}
 
 // ####################################
 // Function Calls
 // ####################################
-%node ArgListExpr Expr = {
-    // Deberian ser un vector, pero TreeCC no deja
-    Expr *head;
-    Expr *tail; // Idealmente seria ArgListExpr, pero no hice que funcionara
+%node FuncCall Expr = {
+    stdstring id;
+    ArgList *args;
 }
-toString(ArgListExpr){
-    stdstring text = head->toString();
-    if (tail != nullptr) {
-        text += ", " + tail->toString();
-    }
-    return text;
-}
+toString(FuncCall){
+    stdstring text = id + "(";
 
-%node FuncCallExpr Expr = {
-    stdstring funcName;
-    Expr *args; // Idealmente seria ArgListExpr, pero no hice que funcionara
-}
-toString(FuncCallExpr){
-    stdstring text = funcName + "(";
-    if (args != nullptr) {
+    if(args) {
         text += args->toString();
     }
     text += ")";
+
     return text;
+}
+genCode(FuncCall){
+    FuncSymbol* func = lookupFunction(id);
+
+    if(!func){
+        std::cerr << "Function " + id + " Not Found";
+        exit(1);
+    }
+
+    stdstring code = "";
+    stdstring argStr = "";
+
+    ParamList *p = func->params;
+    ArgList *a = args;
+
+    while(p && a){
+        Param *param = p->param;
+        Expr *expr = a->arg;
+
+        if(param->isRef){
+            if(std::string(expr->getKindName()) != "IdVal"){
+                std::cerr << "Expeected variable for ref parameter: " << param->id << "\n";
+                exit(1);
+            }
+            IdVal* idNode = (IdVal*) expr;
+            Symbol* sym = lookup(idNode->name);
+            argStr += "i64* " + sym->addr;
+        } else {
+            genResult r = expr->genCode();
+            code += r.code;
+            argStr += "i64 " + r.place;
+        }
+
+        if(p->next){
+            argStr += ", ";
+        }
+        p = p->next;
+        a = a->next;
+    }
+
+    if(p != nullptr || a != nullptr){
+        std::cerr << "Argument count mismatch in call to " << id << "\n";
+        exit(1);
+    }
+
+    if(func->retInt){
+        stdstring t = newTemp();
+        code += t + " = call i64 @" + id + "(" + argStr + ")\n";
+        return genResult(code, t);
+    } else {
+        code += "call void @" + id + "(" + argStr + ")\n";
+        return genResult(code);
+    }
+}
+
+%node ArgList Expr = {
+    Expr *arg;
+    ArgList *next;
+}
+toString(ArgList){
+    if(next){
+        return next->toString() + ", " + arg->toString();
+    } else {
+        return arg->toString();
+    }
+}
+genCode(ArgList){
+    genResult curr = arg->genCode();
+
+    if(next != nullptr){
+        genResult rest = next->genCode();
+
+        stdstring code = curr.code + rest.code;
+        return genResult(code);
+    }
+
+    return genResult(curr.code);
 }

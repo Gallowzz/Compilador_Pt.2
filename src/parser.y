@@ -3,11 +3,11 @@
 
 %define api.value.type variant
 %define parse.error verbose
-%define api.namespace {ExprParser}
+%define api.namespace {AstParser}
 %define api.parser.class {Parser}
 
-%parse-param {ExprParser::Lexer& lexer}
-%parse-param {Expr*& ast}
+%parse-param {AstParser::Lexer& lexer}
+%parse-param {ProgramNode*& ast}
 
 %token KW_INT "int"
 %token KW_VOID "void"
@@ -19,6 +19,7 @@
 %token KW_RETURN "return"
 %token KW_REF "ref"
 
+%token OP_ARROW "->"
 %token OP_PLUS "+"
 %token OP_MIN "-"
 %token OP_MULT "*"
@@ -51,14 +52,15 @@
 %left "&&" "||"
 %right "="
 
-%nterm <AstNode*> program
+%nterm <ProgramNode*> program
+%nterm <StmtList*> global
 %nterm <Stmt*> declaration
-%nterm <Stmt*> funcDecl
-%nterm <AstNode*> paramList
-%nterm <AstNode*> param
-
-%nterm <Stmt*> statement
 %nterm <Stmt*> varDecl
+%nterm <Stmt*> funcDecl
+%nterm <ParamList*> paramList
+%nterm <Param*> param
+
+%nterm <Stmt*> stmt
 %nterm <Stmt*> assignment
 %nterm <Stmt*> ifStmt
 %nterm <Stmt*> whileStmt
@@ -66,7 +68,7 @@
 %nterm <Stmt*> returnStmt
 %nterm <Stmt*> exprStmt
 %nterm <Stmt*> block
-%nterm <Stmt*> stmtList
+%nterm <StmtList*> stmtList
 
 %nterm <Expr*> expr
 %nterm <Expr*> logicalOr
@@ -78,12 +80,12 @@
 %nterm <Expr*> unary
 %nterm <Expr*> primary
 %nterm <Expr*> funcCall
-%nterm <Expr*> argList
+%nterm <ArgList*> argList
 
 %code requires {
-#include "ExprAstParser.hpp"
+#include "Ast.hpp"
 
-namespace ExprParser {
+namespace AstParser {
     class Lexer;
 }
 }
@@ -93,7 +95,7 @@ namespace ExprParser {
 #include <iostream>
 #include "Lexer.hpp"
 
-void ExprParser::Parser::error(const std::string &msg) {
+void AstParser::Parser::error(const std::string &msg) {
     std::cerr << "Parse error: " << msg << std::endl;
 }
 
@@ -103,52 +105,55 @@ void ExprParser::Parser::error(const std::string &msg) {
 %%
 
 input:
-    program { ast = $1; }
+      program { ast = $1; }
 ;
 
-
 program:
-      /* empty */ { $$ = new ProgramNode(); }
-    | program declaration { $1->addDecl($2); $$ = $1; }
+      global { $$ = new ProgramNode($1); }
+;
+
+global:
+      /* empty */        { $$ = nullptr; }
+    | global declaration { $$ = new StmtList($2, $1); }
 ;
 
 declaration:
-      varDecl  { $$ = $1; }
-    | funcDecl { $$ = $1; }
+      varDecl   { $$ = $1; }
+    | funcDecl  { $$ = $1; }
 ;
 
 varDecl:
-      "int" IDENTIFIER "=" expr ";" { $$ = new VarDeclNode($2,$4); }
-    | "int" IDENTIFIER ";"          { $$ = new VarDeclNode($2,nullptr); }
+      "int" IDENTIFIER "=" expr ";" { $$ = new VarDecl($2,$4); }
+    | "int" IDENTIFIER ";"          { $$ = new VarDecl($2,nullptr); }
 ;
 
 funcDecl:
-      "def" IDENTIFIER "(" paramList ")" "->" "int" block   { $$ = new FuncDeclNode($2,$4,true,$7); }
-    | "def" IDENTIFIER "(" paramList ")" "->" "void" block  { $$ = new FuncDeclNode($2,$4,false,$7); }
-    | "def" IDENTIFIER "("  ")" "->" "int" block            { $$ = new FuncDeclNode($2,nullptr,true,$7); }
-    | "def" IDENTIFIER "("  ")" "->" "void" block           { $$ = new FuncDeclNode($2,nullptr,false,$6); }
+      "def" IDENTIFIER "(" paramList ")" "->" "int" block   { $$ = new FuncDecl($2,$4,true,$8); }
+    | "def" IDENTIFIER "(" paramList ")" "->" "void" block  { $$ = new FuncDecl($2,$4,false,$8); }
+    | "def" IDENTIFIER "("  ")" "->" "int" block            { $$ = new FuncDecl($2,nullptr,true,$7); }
+    | "def" IDENTIFIER "("  ")" "->" "void" block           { $$ = new FuncDecl($2,nullptr,false,$7); }
 ;
 
 paramList:
-      paramList "," param { $1->addParam($3); $$ =$1; }
-    | param               { $$ = new ParamListNode($1); }
+      paramList "," param { $$ = new ParamList($3, $1); }
+    | param               { $$ = new ParamList($1, nullptr); }
 ;
 
 param:
-      "int" "ref" IDENTIFIER { $$ = new ParamNode($3, true); }
-    | "int" IDENTIFIER       { $$ = new ParamNode($2, false); }
+      "int" "ref" IDENTIFIER { $$ = new Param($3, true); }
+    | "int" IDENTIFIER       { $$ = new Param($2, false); }
 ;
 
-
-statement:
-      varDecl
-    | assignment
-    | ifStmt
-    | whileStmt
-    | printStmt
-    | returnStmt
-    | exprStmt
-    | block
+// Statments
+stmt:
+      varDecl    { $$ = $1; }
+    | assignment { $$ = $1; }
+    | ifStmt     { $$ = $1; }
+    | whileStmt  { $$ = $1; }
+    | printStmt  { $$ = $1; }
+    | returnStmt { $$ = $1; }
+    | exprStmt   { $$ = $1; }
+    | block      { $$ = $1; }
 ;
 
 assignment:
@@ -156,12 +161,12 @@ assignment:
 ;
 
 ifStmt:
-      "if" "(" expr ")" statement "else" statement { $$ = new IfStmt($3,$5,$7); }
-    | "if" "(" expr ")" statement                  { $$ = new IfStmt($3,$5,nullptr); }
+      "if" "(" expr ")" stmt                  { $$ = new IfStmt($3,$5,nullptr); }
+    | "if" "(" expr ")" stmt "else" stmt      { $$ = new IfStmt($3,$5,$7); }
 ;
 
 whileStmt:
-    "while" "(" expr ")" statement { $$ = new WhileStmt($3,$5); }
+    "while" "(" expr ")" stmt { $$ = new WhileStmt($3,$5); }
 ;
 
 printStmt:
@@ -174,18 +179,20 @@ returnStmt:
 ;
 
 exprStmt:
-    funcCall ";" { $$ = new ExprStmt($1); }
+    expr ";" { $$ = new ExprStmt($1); }
+    // | funcCall ";" { $$ = new ExprStmt($1); }
 ;
 
 block:
-    "{" stmtList "}" { $$ = $2; }
+    "{" stmtList "}" { $$ = new Block($2); }
 ;
 
 stmtList:
-      /* empty */        { $$ = new BlockNode(); }
-    | stmtList statement { $1->addStmt($2); $$ = $1; }
+      /* Empty Block */  { $$ = nullptr; }
+    | stmtList stmt      { $$ = new StmtList($2, $1); }
 ;
 
+// Expressions
 expr:
       logicalOr { $$ = $1; }
 ;
@@ -196,22 +203,22 @@ logicalOr:
 ;
 
 logicalAnd:
-    logicalAnd "&&" equality { $$ = new AndExpr($1, $3); }
-  | equality { $$ = $1; }
+      logicalAnd "&&" equality { $$ = new AndExpr($1, $3); }
+    | equality { $$ = $1; }
 ;
 
 equality:
-    equality "==" comparison { $$ = new EqExpr($1, $3); }
-  | equality "!=" comparison { $$ = new NeqExpr($1, $3); }
-  | comparison { $$ = $1; }
+      equality "==" comparison { $$ = new EqExpr($1, $3); }
+    | equality "!=" comparison { $$ = new NeqExpr($1, $3); }
+    | comparison { $$ = $1; }
 ;
 
 comparison:
-    comparison "<" term { $$ = new LessExpr($1, $3); }
-  | comparison ">" term { $$ = new GreatExpr($1, $3); }
-  | comparison "<=" term { $$ = new LeqExpr($1, $3); }
-  | comparison ">=" term { $$ = new GeqExpr($1, $3); }
-  | term { $$ = $1; }
+      comparison "<" term  { $$ = new LessExpr($1, $3); }
+    | comparison ">" term  { $$ = new GreatExpr($1, $3); }
+    | comparison "<=" term { $$ = new LeqExpr($1, $3); }
+    | comparison ">=" term { $$ = new GeqExpr($1, $3); }
+    | term { $$ = $1; }
 ;
 
 term:
@@ -241,11 +248,11 @@ primary:
 ;
 
 funcCall:
-      IDENTIFIER "(" ")"         { $$ = new FuncCallExpr($1, nullptr); }
-    | IDENTIFIER "(" argList ")" { $$ = new FuncCallExpr($1, $3); }
+      IDENTIFIER "(" ")"          { $$ = new FuncCall($1, nullptr); }
+    | IDENTIFIER "(" argList ")"  { $$ = new FuncCall($1, $3); }
 ;
 
 argList:
-      argList "," expr { $$ = new ArgListExpr($1,$3); }
-    | expr             { $$ = new ArgListExpr($1, nullptr); }
+      argList "," expr   { $$ = new ArgList($3, $1); }
+    | expr               { $$ = new ArgList($1, nullptr); }
 ;
