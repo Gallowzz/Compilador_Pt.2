@@ -252,7 +252,7 @@ genCode(IfStmt){
     } else {
         stdstring Lend  = newLabel();
 
-        code += + "br i1 " + cond.place + ", label %" + Lthen + " , label %" + Lend + "\n"
+        code += + "br i1 " + cond.place + ", label %" + Lthen + ", label %" + Lend + "\n"
                 + Lthen + ":\n"
                 + bodyThen.code
                 + "br label %" + Lend + "\n"
@@ -652,13 +652,48 @@ genCode(FuncCall){
         exit(1);
     }
 
-    genResult arguments = args->genCode();
+    stdstring code = "";
+    stdstring argStr = "";
+
+    ParamList *p = func->params;
+    ArgList *a = args;
+
+    while(p && a){
+        Param *param = p->param;
+        Expr *expr = a->arg;
+
+        if(param->isRef){
+            if(std::string(expr->getKindName()) != "IdVal"){
+                std::cerr << "Expeected variable for ref parameter: " << param->id << "\n";
+                exit(1);
+            }
+            IdVal* idNode = (IdVal*) expr;
+            Symbol* sym = lookup(idNode->name);
+            argStr += "i64* " + sym->addr;
+        } else {
+            genResult r = expr->genCode();
+            code += r.code;
+            argStr += "i64 " + r.place;
+        }
+
+        if(p->next){
+            argStr += ", ";
+        }
+        p = p->next;
+        a = a->next;
+    }
+
+    if(p != nullptr || a != nullptr){
+        std::cerr << "Argument count mismatch in call to " << id << "\n";
+        exit(1);
+    }
+
     if(func->retInt){
         stdstring t = newTemp();
-        stdstring code = t + " = call i64 @" + id + "(" + arguments.place + ")\n";
-        return genResult(code,t);
+        code += t + " = call i64 @" + id + "(" + argStr + ")\n";
+        return genResult(code, t);
     } else {
-        stdstring code = "call void @" + id + "(" + arguments.place + ")\n";
+        code += "call void @" + id + "(" + argStr + ")\n";
         return genResult(code);
     }
 }
@@ -681,9 +716,8 @@ genCode(ArgList){
         genResult rest = next->genCode();
 
         stdstring code = curr.code + rest.code;
-        stdstring place =  curr.place + ", " + rest.place;
-        return genResult(code, place);
+        return genResult(code);
     }
 
-    return curr;
+    return genResult(curr.code);
 }
